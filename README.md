@@ -57,6 +57,83 @@ After each feature, write a retro in `specs/memories/` tracing any
 agent mistakes to the specific missing or weak rule, then tighten it.
 The rules get better with every feature.
 
+## Per-Feature Walkthrough
+
+Here's exactly what to paste in each Zed agent thread, per phase.
+
+### Phase 1 — PM writes requirements
+
+Open a PM thread, paste:
+
+```
+@pm @spec-driven I need to build [describe your feature in 1-3 sentences].
+Start at Phase 1 — draft requirements and non-goals first.
+```
+
+The PM writes `specs/<feature-slug>.md`. Review it, request changes if
+needed, then say "approved."
+
+### Phase 2 — Architect + UX Designer design (parallel)
+
+Open two threads simultaneously:
+
+**Architect:**
+```
+@architect @spec-driven specs/<feature-slug>.md has approved requirements.
+Produce the Design section — API contract, data model, architecture decisions.
+```
+
+**UX Designer:**
+```
+@ux-designer @spec-driven specs/<feature-slug>.md has approved requirements.
+Read the Architect's API contract, then produce the UI Design section —
+components, states, tokens, accessibility.
+```
+
+Both write to the same spec file. Review both sections, then approve.
+
+### Phase 3 — PM breaks into tasks
+
+Back in the PM thread:
+
+```
+@pm @spec-driven specs/<feature-slug>.md is approved through Phase 2.
+Break it into tasks with role assignments.
+```
+
+### Phase 4 — Engineers implement
+
+**Backend first** (must stabilize the API before frontend/mobile consume it):
+
+```
+@backend-engineer @go-chi @spec-driven specs/<feature-slug>.md is ready.
+Implement task 1 from the checklist.
+```
+
+**Once the API is stable,** Frontend and Mobile run in parallel:
+
+```
+@frontend-engineer @nextjs @spec-driven specs/<feature-slug>.md API is live.
+Implement task 3.
+```
+
+```
+@mobile-engineer @expo @spec-driven specs/<feature-slug>.md API is live.
+Implement task 5.
+```
+
+### Quick Reference Card
+
+| Phase | Who | Load these skills | Prompt |
+|-------|-----|-------------------|--------|
+| 1 | PM | `@pm @spec-driven` | "Draft requirements for X" |
+| 2 | Architect | `@architect @spec-driven` | "Design API + data model for spec X" |
+| 2 | UX Designer | `@ux-designer @spec-driven` | "Design UI for spec X" |
+| 3 | PM | `@pm @spec-driven` | "Break spec X into tasks" |
+| 4 | Backend | `@backend-engineer @go-chi @spec-driven` | "Implement task N from spec X" |
+| 4 | Frontend | `@frontend-engineer @nextjs @spec-driven` | "Implement task N from spec X" |
+| 4 | Mobile | `@mobile-engineer @expo @spec-driven` | "Implement task N from spec X" |
+
 ## What's Included
 
 ### Always-On Rules (`AGENTS.md`)
