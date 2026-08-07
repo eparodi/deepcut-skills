@@ -1,0 +1,132 @@
+{
+  "profiles": {
+    "pm": {
+      "display_name": "Project Manager (Senior)",
+      "skills": ["pm"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": false,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "",
+        "reasoning": "PM role is planning-only: needs read/grep to understand context, write to produce specs. Terminal and fetch are disabled since PM never runs code."
+      }
+    },
+    "architect": {
+      "display_name": "Architect (Senior)",
+      "skills": ["architect"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": false,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "claude-opus",
+        "reasoning": "Architect designs API contracts, data models, and system architecture. Terminal disabled — produces design artifacts only. Use Claude Opus for complex architecture decisions."
+      }
+    },
+    "ux-designer": {
+      "display_name": "UX Designer (Senior)",
+      "skills": ["ux-designer"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": false,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "claude-opus",
+        "reasoning": "UX Designer produces UI design artifacts: components, states, tokens, accessibility. Terminal disabled — never writes implementation code."
+      }
+    },
+    "backend-engineer": {
+      "display_name": "Backend Engineer (Senior)",
+      "skills": ["backend-engineer", "go-chi", "spec-driven"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "claude-opus",
+        "reasoning": "Full read/write/terminal for Go development. Use Claude Opus for complex type design, architecture changes, and when DeepSeek hallucinates Go APIs."
+      },
+      "write_scope": {
+        "include": ["backend/", "specs/"],
+        "exclude": ["frontend/", "mobile/"]
+      }
+    },
+    "frontend-engineer": {
+      "display_name": "Frontend Engineer (Senior)",
+      "skills": ["frontend-engineer", "nextjs", "spec-driven"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "",
+        "reasoning": "Full read/write/terminal for Next.js development. DeepSeek is usually sufficient for Next.js work."
+      },
+      "write_scope": {
+        "include": ["frontend/", "specs/"],
+        "exclude": ["backend/", "mobile/"]
+      }
+    },
+    "mobile-engineer": {
+      "display_name": "Mobile Engineer (Senior)",
+      "skills": ["mobile-engineer", "expo", "spec-driven"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "",
+        "reasoning": "Full read/write/terminal for Expo/React Native development."
+      },
+      "write_scope": {
+        "include": ["mobile/", "specs/"],
+        "exclude": ["backend/", "frontend/"]
+      }
+    }
+  },
+  "version": "1.1.0",
+  "last_updated": "2026-08-06"
+}
