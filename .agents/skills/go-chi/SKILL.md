@@ -9,62 +9,69 @@ You are writing Go code using net/http stdlib + chi router v5. Follow
 these conventions exactly. When DeepSeek suggests something that
 contradicts this document, trust this document.
 
-## Project Layout (Monorepo)
+## Project Layout — Modular Monolith (Hexagonal Architecture)
 
 ```
 backend/
 ├── cmd/
 │   └── server/
-│       └── main.go            # Entry point, wires everything
+│       └── main.go                  # Entry point, wires all modules
 ├── internal/
-│   ├── handler/               # HTTP handlers (one file per resource)
-│   │   ├── users.go
-│   │   ├── products.go
-│   │   └── routes.go          # chi route registration
-│   ├── service/               # Business logic
-│   │   ├── users.go
-│   │   └── products.go
-│   ├── store/                 # Data access (database, external APIs)
-│   │   ├── postgres/
-│   │   │   ├── queries/       # sqlc query files (.sql)
-│   │   │   ├── db.go          # pgxpool setup
-│   │   │   ├── models.go      # sqlc-generated (DO NOT EDIT)
-│   │   │   └── querier.go     # sqlc-generated interface
-│   │   │   ├── users.go       # Repository methods
-│   │   │   └── products.go
-│   │   └── memstore/          # In-memory store for tests
-│   ├── middleware/             # Custom middleware
-│   │   ├── auth.go
-│   │   ├── logging.go
-│   │   └── requestid.go
-│   ├── model/                 # Domain types (shared across layers)
-│   │   ├── user.go
-│   │   └── product.go
-│   ├── errs/                  # Custom error types
-│   │   └── errors.go
-│   └── config/                # Configuration
-│       └── config.go
+│   ├── shared/                      # Shared kernel
+│   │   ├── errs/errors.go           # AppError types
+│   │   └── render/render.go         # JSON helpers
+│   └── modules/                     # One directory per domain
+│       ├── auth/                    # Auth module
+│       │   ├── domain/
+│       │   │   ├── entity.go        # User
+│       │   │   └── repository.go    # Repository interface (port)
+│       │   ├── application/
+│       │   │   └── service.go       # Business logic
+│       │   └── adapter/
+│       │       ├── http/
+│       │       │   └── handler.go   # HTTP handlers + RegisterRoutes
+│       │       └── postgres/
+│       │           └── repo.go      # Implements domain.Repository
+│       ├── streams/                 # Streams module
+│       │   ├── domain/
+│       │   │   ├── entity.go        # Stream, LiveStream
+│       │   │   └── repository.go    # Repository interface
+│       │   ├── application/
+│       │   │   └── service.go
+│       │   └── adapter/
+│       │       ├── http/handler.go
+│       │       └── postgres/repo.go
+│       ├── chat/                    # Chat module
+│       │   └── ...
+│       └── vods/                    # VODs module
+│           └── ...
 ├── db/
-│   └── migrations/            # golang-migrate SQL files
-│       ├── 000001_create_users.up.sql
-│       └── 000001_create_users.down.sql
+│   └── migrations/
+└── go.mod
+```
 ├── go.mod
 ├── go.sum
 └── Makefile
 ```
 
-### Layer Rules
+### Layer Rules (Hexagonal)
 
-| Layer | Directory | Can import | Must NOT import |
-|-------|-----------|-----------|-----------------|
-| Handler | `internal/handler/` | `service`, `model`, `errs`, `middleware` | `store` directly |
-| Service | `internal/service/` | `store`, `model`, `errs` | `handler`, `net/http` |
-| Store | `internal/store/` | `model`, `errs` | `handler`, `service`, `net/http` |
-| Model | `internal/model/` | nothing | `handler`, `service`, `store` |
+| Layer | Location | Can import | Must NOT import |
+|-------|----------|-----------|-----------------|
+| Domain | `modules/<name>/domain/` | `shared/errs` | `application`, `adapter`, `net/http`, `database/sql` |
+| Application | `modules/<name>/application/` | `domain`, `shared/errs` | `adapter`, `net/http`, `database/sql` |
+| Adapter (HTTP) | `modules/<name>/adapter/http/` | `application`, `shared/errs`, `shared/render` | `adapter/postgres` directly |
+| Adapter (Postgres) | `modules/<name>/adapter/postgres/` | `domain` (to implement interfaces) | `application`, `adapter/http`, `net/http` |
+| Shared | `shared/` | nothing (or stdlib only) | any module |
 
-**Rule:** Handlers parse HTTP, services enforce business rules, stores
-talk to databases. A handler never opens a database connection. A service
-never parses an HTTP request body.
+**Key rules:**
+- Repository interfaces are defined in `domain/` (ports)
+- Postgres adapters implement those interfaces
+- Services accept interfaces, never concrete *postgres.Repo
+- Handlers call services only, never repositories directly
+- Each module registers its own routes via `RegisterRoutes(chi.Router, ...)`
+- No cross-module domain imports — if a module needs another module's data,
+  define a local port (minimal interface) or go through the application layer
 
 ## chi Router Patterns
 
