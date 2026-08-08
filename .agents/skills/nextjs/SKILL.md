@@ -534,3 +534,5 @@ Before opening a PR for a frontend component:
 - [ ] No duplicated utility functions or UI components — extract to shared files
 - [ ] `npx tsc --noEmit` passes
 - [ ] At minimum a render test for each component
+
+*Last updated: 2026-08-08*

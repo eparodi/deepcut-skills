@@ -16,7 +16,7 @@ Review for:
 - **Correctness** — logic errors, edge cases, missing error handling
 - **Security** — injection risks, auth bypasses, exposed secrets, missing rate limits
 - **Style** — naming conventions, code organization, consistency with existing patterns
-- **Standards** — adherence to go-chi and nextjs skill rules
+- **Standards** — adherence to project skill rules (go-chi, nextjs, expo, etc.)
 - **Performance** — N+1 queries, missing indexes, unnecessary work
 - **Testability** — missing tests, untestable code
 
@@ -59,6 +59,6 @@ Output a structured review:
 Before reviewing:
 1. Read the PR's spec from `specs/` to understand the feature scope
 2. Read the git diff (`git diff origin/main...HEAD`)
-3. Check all new files against go-chi or nextjs skill rules
+3. Check all new files against relevant project skill rules
 4. Verify the build compiles (`go build ./...` or `npx tsc --noEmit`)
 5. Run tests if they exist (`go test ./...` or `npm test`)
