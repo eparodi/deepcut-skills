@@ -57,8 +57,11 @@ Output a structured review:
 ## Pre-Review Checklist
 
 Before reviewing:
-1. Read the PR's spec from `specs/` to understand the feature scope
-2. Read the git diff (`git diff origin/main...HEAD`)
-3. Check all new files against relevant project skill rules
-4. Verify the build compiles (`go build ./...` or `npx tsc --noEmit`)
-5. Run tests if they exist (`go test ./...` or `npm test`)
+1. Verify the branch name matches the PR being reviewed. Run `git branch --show-current` and confirm it matches the expected branch (e.g., `feat/us4-chat`, not `feat/us2-streams`).
+2. Read the PR's spec from `specs/` to understand the feature scope
+3. Read the git diff (`git diff origin/main...HEAD`)
+4. Check all new files against relevant project skill rules
+5. Verify the build compiles (`go build ./...` or `npx tsc --noEmit`)
+6. Run tests if they exist (`go test ./...` or `npm test`)
+
+*Last updated: 2026-08-08*
