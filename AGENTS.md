@@ -136,6 +136,11 @@ going to do. This prevents scope creep and clarifies boundaries.
   - Edge case (empty input, max length, boundary values)
 - New UI components must have at minimum a render test and tests for
   each distinct state (loading, empty, error, populated).
+- **Test data must avoid secret-scanner patterns.** Fake keys, tokens,
+  and credentials in test fixtures must not match patterns that trigger
+  GitHub push protection (Stripe `sk_live_`, `rk_live_`; AWS `AKIA*`;
+  GitHub `ghp_*`; etc.). Use obviously-fake prefixes like `test_`,
+  `fake_`, or project-specific prefixes.
 
 ### 4.3 Linting
 
@@ -191,6 +196,9 @@ You may freely:
 - Create files with `write_file`
 - Run terminal commands that modify the project (e.g., `go mod tidy`)
 - Run `git` write operations only when explicitly asked
+- **Clean up after parallel agents.** After spawning sub-agents that
+  write files, check for and remove junk artifacts (files with ` 2`
+  suffix, duplicated directories) before committing.
 
 ### 6.3 What You May NOT Do
 

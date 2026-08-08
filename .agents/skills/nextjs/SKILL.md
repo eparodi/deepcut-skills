@@ -535,5 +535,6 @@ Before opening a PR for a frontend component:
 - [ ] `npx tsc --noEmit` passes
 - [ ] At minimum a render test for each component
 - [ ] Vitest config uses `fileURLToPath` for cross-platform path aliases (not `.pathname`)
+- [ ] All vitest functions (`describe`, `it`, `expect`, `vi`, `beforeEach`, `afterEach`) imported explicitly — do not rely on `globals: true`
 
 *Last updated: 2026-08-08*
