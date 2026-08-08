@@ -49,6 +49,20 @@ mobile/
 └── babel.config.js
 ```
 
+### `.nvmrc` — pin Node version
+
+Always include a `.nvmrc` file in the mobile root so `nvm use` picks
+the correct Node version automatically:
+
+```
+# mobile/.nvmrc
+24
+```
+
+Use the latest active LTS (24 Krypton as of 2026-08). Expo SDK 52+ targets
+Node 18+, but pinning to LTS avoids surprises with native module
+compatibility.
+
 ## Managed Workflow Boundaries
 
 ### DO — Use expo-* packages FIRST

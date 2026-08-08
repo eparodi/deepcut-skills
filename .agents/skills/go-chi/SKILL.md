@@ -300,6 +300,11 @@ if errors.As(err, &appErr) {
 | `return nil, err` (bare) | `return nil, fmt.Errorf("context: %w", err)` |
 | Panic in handler | Return error; Recoverer middleware catches panics |
 | `errors.New("user not found")` | `errs.NotFound("user %s not found", id)` |
+| `_ = someFunc()` (discard error) | At minimum `slog.Error("op failed", "err", err)`. If the error is truly non-critical, log it. |
+
+**Bare error returns are banned.** Every error crossing a layer boundary must be wrapped with context. This is not optional — unwrapped errors make debugging production incidents near-impossible.
+
+**Silently discarded errors (`_ =`) are banned.** If a function returns an error you genuinely don't care about, log it at WARN or ERROR level. Silent data loss is worse than a noisy log.
 
 ## Testing
 
@@ -499,6 +504,9 @@ DELETE FROM users WHERE id = $1;
 | Raw `database/sql` calls | Always go through sqlc-generated `Queries` |
 | `:exec` when you need affected rows | Use `:execrows` to get `sql.Result.RowsAffected()` |
 | Manual SQL in Go strings | Queries in `.sql` files; run `make sqlc` to regenerate |
+| `for rows.Next() { ... }` without `rows.Err()` | Always check `if err := rows.Err(); err != nil { return ... }` after the loop |
+
+**`rows.Err()` is mandatory.** After every `for rows.Next()` loop, you MUST check `rows.Err()`. A mid-iteration error (network drop, query cancel) silently returns partial results if unchecked. This applies to both sqlc-generated queries and raw pgx/sql calls.
 
 ### DO — Store wrapper with transactions
 
@@ -569,9 +577,14 @@ func (s *Store) WithTx(ctx context.Context, fn func(*Queries) error) error {
 
 Before claiming an endpoint is "stable":
 - [ ] All four timeouts configured on `http.Server`
-- [ ] `MaxBytesReader` limits request body size
-- [ ] Every handler has `defer r.Body.Close()`
+- [ ] `MaxBytesReader` limits request body size on every POST/PATCH/PUT handler
+- [ ] `defer r.Body.Close()` after reading body (NOT on GET/HEAD handlers)
+- [ ] All JSON decoders use `DisallowUnknownFields()`
 - [ ] Error responses use the `errs.AppError` type system
+- [ ] No bare error returns — every layer-crossing error wrapped with `fmt.Errorf("ctx: %w", err)`
+- [ ] No `_ =` discarded errors — at minimum logged
+- [ ] Every `for rows.Next()` loop checks `rows.Err()` afterward
 - [ ] Table-driven tests cover: happy path + each error path + edge cases
 - [ ] Integration test hits the router with a real request
 - [ ] `go build ./...` and `go vet ./...` pass
+- [ ] Dev-default secrets log a `slog.Warn` at startup
