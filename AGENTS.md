@@ -44,6 +44,11 @@ DeepSeek tends to skip upfront design and jump to code. Force a plan:
   touch code.
 - **One logical change per commit.** Do not bundle refactors with
   features, or bugfixes with enhancements.
+- **Ambiguous verbs default to read-only.** If the user's instruction
+  uses an inspection verb ("check", "look at", "review", "what's wrong",
+  "show me"), default to reporting findings. Do NOT fix, commit, or push
+  unless the user explicitly asks. When in doubt, ask: "I found X. Want
+  me to fix it?"
 
 ### 1.3 Over-Confidence Calibration
 
@@ -147,6 +152,11 @@ going to do. This prevents scope creep and clarifies boundaries.
   asks you to.
 - You may run `git --no-optional-locks status`, `git diff --stat`,
   and other read-only git commands freely.
+- **Before committing, verify the user's message contains an explicit
+  write instruction** ("commit", "push", "merge", "create a PR").
+  Inspection verbs ("check", "look", "review", "show") are NOT
+  authorization to commit. If unclear, ask: "Ready for me to commit
+  and push this?"
 
 ### 5.2 Branching Convention
 
