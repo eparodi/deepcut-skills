@@ -54,6 +54,19 @@ frontend/
 └── next.config.ts
 ```
 
+### `.nvmrc` — pin Node version
+
+Always include a `.nvmrc` file in the frontend root so `nvm use` picks
+the correct Node version automatically:
+
+```
+# frontend/.nvmrc
+24
+```
+
+Match the Node version to Next.js requirements. Next.js 16 requires
+`>=20.9.0`. Use the latest active LTS (24 Krypton as of 2026-08).
+
 ## Server Components by DEFAULT
 
 ### Rule: Never add `"use client"` unless you have to
@@ -451,3 +464,75 @@ export const config = {
 | `import { useActionState } from "react-dom"` | `import { useActionState } from "react"` |
 | `import { Link } from "next/link"` | `import Link from "next/link"` (default export) |
 | `import { headers, cookies } from "next/headers"` and not awaiting | `headers()` and `cookies()` return Promises in Next.js 15+ |
+
+## Component Patterns & Anti-Patterns
+
+### DO — Extract duplicated components
+
+If you find the same component/function defined in 3+ files, extract to a shared file.
+Common culprits:
+- `Spinner` / `LoadingSpinner`
+- `formatDate` / `formatNumber`
+- `EmptyState` with icon + message
+
+```tsx
+// ❌ Wrong — duplicated in 3 files
+// UserForm.tsx, PostForm.tsx, SettingsForm.tsx
+function Spinner() { return <svg className="animate-spin" ... />; }
+
+// ✅ Right — shared component
+// components/ui/Spinner.tsx
+export function Spinner() { return <svg className="animate-spin" ... />; }
+```
+
+### DO NOT — Module-level mutable state
+
+Module-level variables (`let userPromise: Promise<User> | null = null`) are
+shared across all SSR requests and concurrent renders. During HMR or
+concurrent rendering, one request can read another's data.
+
+```tsx
+// ❌ Wrong — shared across all renders
+let userPromise: Promise<User> | null = null;
+function fetchUser() {
+  if (!userPromise) userPromise = getMe();
+  return userPromise;
+}
+
+// ✅ Right — per-component state or React.cache()
+function Component() {
+  const [user, setUser] = useState<User | null>(null);
+  useEffect(() => { getMe().then(setUser); }, []);
+  // ...
+}
+
+// ✅ Also right — Server Component data fetching
+import { cache } from "react";
+const getUser = cache(async () => { /* fetch from DB */ });
+```
+
+### DO NOT — Inline style objects when Tailwind classes exist
+
+Tailwind v4 with `@theme inline` maps CSS custom properties to utility
+classes. Prefer classes over inline `style={{}}`:
+
+```tsx
+// ❌ Wrong — runtime style object
+<div style={{ backgroundColor: "var(--color-surface-raised)" }}>
+
+// ✅ Right — Tailwind class
+<div className="bg-surface-raised">
+```
+
+### Pre-Deploy Checklist
+
+Before opening a PR for a frontend component:
+- [ ] No `"use client"` unless the component uses hooks, event handlers, or browser APIs
+- [ ] Server Components fetch data, Client Components receive it via props
+- [ ] Each component has: loading state (skeleton), empty state, error state
+- [ ] No module-level mutable variables — use `useState` + `useEffect` or React `cache()`
+- [ ] No duplicated utility functions or UI components — extract to shared files
+- [ ] `npx tsc --noEmit` passes
+- [ ] At minimum a render test for each component
+
+*Last updated: 2026-08-08*
