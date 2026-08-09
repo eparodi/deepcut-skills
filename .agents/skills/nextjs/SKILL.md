@@ -67,6 +67,15 @@ the correct Node version automatically:
 Match the Node version to Next.js requirements. Next.js 16 requires
 `>=20.9.0`. Use the latest active LTS (24 Krypton as of 2026-08).
 
+**The agent shell does not auto-load nvm.** Always verify the active
+Node version matches `.nvmrc` before running `npm` or `node` commands.
+If mismatched, prefix with the nvm path:
+```bash
+node --version  # verify before proceeding
+# If mismatch, use:
+PATH="$HOME/.nvm/versions/node/v$(cat .nvmrc)/bin:$PATH" npm install
+```
+
 ## Server Components by DEFAULT
 
 ### Rule: Never add `"use client"` unless you have to
@@ -533,8 +542,45 @@ Before opening a PR for a frontend component:
 - [ ] No module-level mutable variables — use `useState` + `useEffect` or React `cache()`
 - [ ] No duplicated utility functions or UI components — extract to shared files
 - [ ] `npx tsc --noEmit` passes
+- [ ] `npm run lint` passes (with `--max-warnings 0` — CI enforces this)
 - [ ] At minimum a render test for each component
 - [ ] Vitest config uses `fileURLToPath` for cross-platform path aliases (not `.pathname`)
 - [ ] All vitest functions (`describe`, `it`, `expect`, `vi`, `beforeEach`, `afterEach`) imported explicitly — do not rely on `globals: true`
 
-*Last updated: 2026-08-08*
+### React Patterns — `useRef` vs `useState`
+
+When a boolean flag exists only to prevent re-execution of a side effect
+(not to drive rendering), use `useRef` instead of `useState`. Refs don't
+trigger re-renders and don't need to be in dependency arrays:
+
+```tsx
+// ❌ Triggers re-render → re-creates useCallback → re-runs useEffect
+const [didRun, setDidRun] = useState(false);
+const fetchData = useCallback(() => {
+  if (!didRun) { setDidRun(true); doWork(); }
+}, [didRun]); // dep changes on first run → double-fetch
+
+// ✅ No re-render, no dep array change
+const hasRunRef = useRef(false);
+const fetchData = useCallback(() => {
+  if (!hasRunRef.current) { hasRunRef.current = true; doWork(); }
+}, []); // stable
+```
+
+### ESLint — underscore-prefix does NOT suppress unused-vars
+
+ESLint's `@typescript-eslint/no-unused-vars` does **not** treat `_` prefix
+as "intentionally unused" by default (unlike Go or Python).
+
+```tsx
+// ❌ Still triggers @typescript-eslint/no-unused-vars
+const Mock = ({ _unused, used }: Props) => <div>{used}</div>;
+
+// ✅ Use the full props object to avoid the warning
+const Mock = (props: Props) => <div>{props.used}</div>;
+```
+
+Alternatively, configure `argsIgnorePattern: "^_"` in `eslint.config` to
+enable underscore-prefix suppression globally.
+
+*Last updated: 2026-08-09*
