@@ -127,6 +127,14 @@ going to do. This prevents scope creep and clarifies boundaries.
 - Run targeted tests for the code you changed. If you changed a handler,
   run that handler's tests. Escalate to the full suite only when
   relevant.
+- **Node projects: verify Node version matches `.nvmrc`** before any
+  `npm` or `node` command. The agent shell does not auto-load nvm. If the
+  active Node version doesn't match, prefix commands with the nvm path:
+  ```bash
+  node --version  # verify before proceeding
+  # If mismatch, use:
+  PATH="$HOME/.nvm/versions/node/v$(cat .nvmrc)/bin:$PATH" npm install
+  ```
 
 ### 4.2 Test Coverage
 
@@ -146,6 +154,16 @@ going to do. This prevents scope creep and clarifies boundaries.
 
 - Fix all lint errors before considering work done. Do not suppress
   warnings unless explicitly asked.
+- **Run the linter as part of pre-push verification**, not just the
+  type checker. CI enforces `--max-warnings 0`, so a clean `tsc` is
+  not sufficient:
+  ```bash
+  # Frontend
+  cd frontend && npm run lint
+
+  # Backend
+  cd backend && go vet ./...
+  ```
 
 ---
 
