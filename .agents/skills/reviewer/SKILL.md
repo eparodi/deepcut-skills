@@ -64,4 +64,16 @@ Before reviewing:
 5. Verify the build compiles (`go build ./...` or `npx tsc --noEmit`)
 6. Run tests if they exist (`go test ./...` or `npm test`)
 
+---
+
+## Automatic Trigger
+
+When the orchestrator calls you, it will provide the PR number and the
+spec slug. You should:
+1. Fetch the PR diff (`gh pr diff <number>` or read the branch directly).
+2. Read the spec.
+3. Proceed with your standard review.
+4. Output `[REVIEW_PASS]` or `[REVIEW_FAIL]` so the orchestrator can
+   react.
+
 *Last updated: 2026-08-08*

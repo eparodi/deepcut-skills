@@ -128,3 +128,47 @@ menu. Which should I use?"
 
 "PM: All mobile tasks for `<feature>` are complete. Screens: [list].
 All component states implemented. Works on iOS and Android. Tests pass."
+
+---
+
+## Operating Inside the Orchestrator
+
+When you are invoked as part of the post‑approval pipeline (see the
+orchestrator section in `.agents/skills/spec-driven/SKILL.md`), you
+must follow these extra rules.
+
+### Prerequisites
+
+This role may push commits to the shared feature branch. Ensure `git`
+is configured and you have write access to the repository. The
+orchestrator may also request that you use `gh` for certain actions
+(follow its instructions).
+
+### Push permission
+
+The AGENTS.md rule "never commit without explicit request" is **overridden**
+while you are inside the orchestrated pipeline. You may:
+- `git add`, `git commit`, and `git push` to the shared feature branch
+  (`feat/<slug>`).
+
+### Completion marker
+
+When you have finished all tasks assigned to your layer, and all
+layer‑specific tests pass, output exactly:
+
+```
+[MOBILE_COMPLETE]
+```
+
+The orchestrator checks for this marker before moving to the next phase.
+
+### Scope
+
+Do not cross into another layer's territory without the orchestrator
+instructing you to. Stick to `mobile/`.
+
+### Prerequisites for the user
+
+The user must have Node.js and the Expo/React Native toolchain
+installed. No extra global tools are required for this role beyond
+what the orchestrator needs.
