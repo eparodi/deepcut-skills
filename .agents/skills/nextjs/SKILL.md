@@ -584,5 +584,3 @@ Alternatively, configure `argsIgnorePattern: "^_"` in `eslint.config` to
 enable underscore-prefix suppression globally.
 
 *Last updated: 2026-08-09*
-
-*Last updated: 2026-08-08*
