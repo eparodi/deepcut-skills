@@ -22,6 +22,15 @@ often than other models. Counter with:
   grep -r "import.*<package>" --include="*.go" backend/
   grep -r "from.*<package>" --include="*.ts*" frontend/
   ```
+- **Cite the contract before writing the implementation.** Before writing a
+  handler response struct, grep the frontend TypeScript type from
+  `frontend/src/types/index.ts` and match every field name exactly.
+  ```bash
+  grep -A 30 "interface <TypeName>" frontend/src/types/index.ts
+  ```
+  Verify: (1) all frontend fields are present in your response, (2) no
+  extra fields, (3) wrapper objects match (bare array vs `{items, total}`),
+  (4) optional fields use `omitempty`.
 - **"I don't know" is a valid answer.** If you cannot find the exact
   API you need in the codebase or in known documentation, say so and
   ask the user. Do NOT fabricate.
@@ -78,6 +87,11 @@ DeepSeek can sound very sure about incorrect things.
   `fmt.Errorf("context: %w", err)` vs `errors.Wrap`).
 - **Testing style.** Match table-driven vs sub-test patterns, assertion
   library, and mock approach already in use.
+- **API contract fidelity.** Response shapes must match the frontend
+  TypeScript types exactly. No extra fields (e.g., `createdAt` not in
+  `User`), no missing fields (e.g., `streamCategory` omitted), correct
+  wrapper objects (`{streams, total}` not a bare array). When in doubt,
+  grep the type definition in `frontend/src/types/index.ts`.
 
 ### 2.2 When You DO Need a New Pattern
 
@@ -107,9 +121,34 @@ going to do. This prevents scope creep and clarifies boundaries.
 
 ---
 
-## Section 4 — Output & Testing Discipline
+## Section 4 — Security
 
-### 4.1 Build Verification
+### 4.1 SQL Injection Prevention
+
+- **Never concatenate user input into SQL strings.** Use parameterized
+  queries (`$1`, `$2`, etc.) for all values. Do not use `fmt.Sprintf`
+  to build WHERE clauses from user-controlled input (including query
+  parameters like `?period=week`).
+  - ❌ `fmt.Sprintf("SELECT ... WHERE date >= '%s'", period)`
+  - ✅ Parameterized query with fixed enum branches or a validated
+    value passed as `$1`
+- **Validate enums before passing to queries.** If a query parameter
+  selects a filter branch (e.g., `week`/`month`/`all`), validate the
+  value against the allowed set before any database access.
+
+### 4.2 Hardcoded Secrets
+
+- Never commit secrets (API keys, private keys, passwords, tokens) to
+  the repository.
+- Use environment variables with clear defaults for local development.
+- Dev-default secrets must log a `slog.Warn` at startup so they are
+  visible during development.
+
+---
+
+## Section 5 — Output & Testing Discipline
+
+### 5.1 Build Verification
 
 - **After any code change, run the build.**
   ```bash
@@ -128,7 +167,15 @@ going to do. This prevents scope creep and clarifies boundaries.
   run that handler's tests. Escalate to the full suite only when
   relevant.
 
-### 4.2 Test Coverage
+- **Verify call sites before changing signatures.** Before changing a
+  function signature (adding/removing parameters, changing types), grep
+  all call sites and update every one in the same commit.
+  ```bash
+  grep -r "FunctionName(" --include="*.go" backend/
+  ```
+  Broken callers in test files are still broken callers.
+
+### 5.2 Test Coverage
 
 - New code in backend must have table-driven tests covering:
   - Happy path
@@ -137,16 +184,16 @@ going to do. This prevents scope creep and clarifies boundaries.
 - New UI components must have at minimum a render test and tests for
   each distinct state (loading, empty, error, populated).
 
-### 4.3 Linting
+### 5.3 Linting
 
 - Fix all lint errors before considering work done. Do not suppress
   warnings unless explicitly asked.
 
 ---
 
-## Section 5 — Git & Commit Hygiene
+## Section 6 — Git & Commit Hygiene
 
-### 5.1 Never Commit Without Explicit Request
+### 6.1 Never Commit Without Explicit Request
 
 - Do NOT run `git commit` or `git push` unless the user explicitly
   asks you to.
@@ -157,26 +204,50 @@ going to do. This prevents scope creep and clarifies boundaries.
   Inspection verbs ("check", "look", "review", "show") are NOT
   authorization to commit. If unclear, ask: "Ready for me to commit
   and push this?"
+- **When using `gh pr create` with a markdown body**, avoid backtick
+  characters in `--body` — the shell interprets them as command
+  substitution, truncating the body. Use `gh pr edit` afterward, or
+  write the body to a file and use `--body-file`.
+  ```bash
+  # Shell eats backticks in --body
+  gh pr create --title "..." --body "use \`SetupDB()\`"  # broken
 
-### 5.2 Branching Convention
+  # Write to a file instead
+  echo 'use `SetupDB()`' > /tmp/body.md
+  gh pr create --title "..." --body-file /tmp/body.md
+  ```
+
+### 6.2 Branching Convention
 
 When the user asks you to start work:
 - Branch prefix: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`
 - Use kebab-case: `feat/user-profile-edit`
 - Push the branch immediately so CI runs.
 
-### 5.3 Commit Messages
+### 6.3 Commit Messages
 
 - Follow [Conventional Commits](https://www.conventionalcommits.org/):
   `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`
 - Body explains WHY, not just WHAT.
 - Keep subject line under 72 characters.
 
+### 6.4 CI/CD Conventions
+
+When creating or modifying CI workflows:
+
+- **Check for existing workflows before creating new ones.** If a CI
+  workflow for the same stack already exists (e.g., `backend-ci.yml`),
+  modify it rather than creating a competing file. Two workflows with
+  overlapping path triggers cause duplicate CI runs.
+  ```bash
+  ls .github/workflows/
+  ```
+
 ---
 
-## Section 6 — Tool Access
+## Section 7 — Tool Access
 
-### 6.1 Read-Only Operations
+### 7.1 Read-Only Operations
 
 You may freely:
 - Read files with `read_file`
@@ -185,14 +256,14 @@ You may freely:
 - Run read-only git commands
 - Run build and test commands
 
-### 6.2 Write Operations
+### 7.2 Write Operations
 
 - Edit files with `edit_file` (preferred for targeted changes)
 - Create files with `write_file`
 - Run terminal commands that modify the project (e.g., `go mod tidy`)
 - Run `git` write operations only when explicitly asked
 
-### 6.3 What You May NOT Do
+### 7.3 What You May NOT Do
 
 - Run commands that require network access without the user's knowledge
 - Install global packages without asking
@@ -201,7 +272,7 @@ You may freely:
 
 ---
 
-## Section 7 — The Specs Directory
+## Section 8 — The Specs Directory
 
 The `specs/` directory is the **single source of truth** for all active
 features. Specs are git-committed (unlike temporary working docs).
@@ -214,14 +285,14 @@ features. Specs are git-committed (unlike temporary working docs).
 
 ---
 
-## Section 8 — Session Log & Retros
+## Section 9 — Session Log & Retros
 
 Every session that involves corrections, bug fixes, or user feedback
 MUST log those events to a session log file so nothing is lost before
 the retro. The retro's job is to trace each correction to a specific
 missing rule and fix that rule.
 
-### 8.1 Session Log
+### 9.1 Session Log
 
 - **File:** `specs/memories/<YYYY-MM-DD>-session-log.md`
 - **Format:** a running table of corrections with root cause + fix,
@@ -229,7 +300,7 @@ missing rule and fix that rule.
 - **Update after every correction**, not just at the end
 - One log per day/session
 
-### 8.2 Retro Process
+### 9.2 Retro Process
 
 At the end of a feature or session:
 1. Review the session log
