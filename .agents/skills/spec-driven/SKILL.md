@@ -233,3 +233,163 @@ the Architect — do NOT silently change the contract.
 | 2. Design | Architect + UX Designer | Architecture + API + Data Model + UI Design | ✅ Human |
 | 3. Task Breakdown | PM | Ordered checklist with role assignments | ❌ Auto |
 | 4. Implementation | Engineers | Working code | ✅ Tests |
+
+---
+
+## Prerequisites (for Post-Approval Pipeline)
+
+The automatic pipeline requires the following CLI tools installed and
+authenticated:
+
+- **`gh`** (GitHub CLI) — used for creating PRs and polling CI checks.
+  Run `gh auth login` before starting.
+- **`jq`** (JSON processor) — used inside the CI polling loop to parse
+  check status.
+
+These must be available on `$PATH` when the agent runs.
+
+---
+
+## Post-Approval Orchestration (Automatic Pipeline)
+
+> This section activates **immediately after the spec reaches Approved
+> status**. You must drive the entire implementation without asking the
+> user for product or technical decisions. Only pause if a genuine
+> ambiguity in the approved spec surfaces.
+
+### Phase 0 — Task Breakdown
+
+1. Read the approved spec from `specs/<slug>.md`.
+2. Break it into concrete implementation tasks, grouped by layer:
+   - `backend/`
+   - `frontend/`
+   - `mobile/` (only if the spec includes mobile changes)
+3. Print the task list so it's visible in the agent output (no user
+   confirmation required).
+
+### Phase 1 — Implementation (shared feature branch)
+
+**Branch**: `feat/<slug>` (create if not yet pushed; use the same branch
+for all engineers).
+
+**Order**: Always implement backend first (so stable API contracts exist),
+then frontend and mobile in parallel.
+
+For each layer:
+
+1. **Load the role's skill file** (e.g., `.agents/skills/backend-engineer/SKILL.md`)
+   and adopt that role.
+2. Implement the tasks assigned to that layer.
+3. Run the layer's full test suite and lint.
+4. Once all tests pass: commit and push to the shared branch.
+5. Output the completion marker `[<LAYER>_COMPLETE]`.
+
+**Permission**: The usual AGENTS.md rule "never commit without explicit
+request" is overridden within this orchestrated pipeline. You may
+`git add`, `git commit`, and `git push` freely while acting inside the
+orchestrator.
+
+### Phase 2 — Create PR
+
+Once all required layers have output their completion markers:
+
+```bash
+gh pr create \
+  --base main \
+  --head feat/<slug> \
+  --title "feat: <spec title>" \
+  --body-file /tmp/pr-body.md \
+  --draft
+```
+
+Write the PR body from the spec's summary and task list (use a temp file
+without backticks to avoid shell escaping issues).
+
+### Phase 3 — CI gate (polling)
+
+After the PR is created, poll GitHub Checks with a timeout:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+PR=$1
+TIMEOUT=600   # 10 minutes
+INTERVAL=15   # seconds
+ELAPSED=0
+
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    # Count checks that are not SUCCESS
+    PENDING=$(gh pr checks "$PR" --json state --jq '[.[] | select(.state != "SUCCESS")] | length')
+    if [ "$PENDING" -eq 0 ]; then
+        echo "[CI_PASS]"
+        exit 0
+    fi
+    # If any check has conclusion FAILURE, exit early
+    FAILURES=$(gh pr checks "$PR" --json conclusion --jq '[.[] | select(.conclusion == "FAILURE")] | length')
+    if [ "$FAILURES" -gt 0 ]; then
+        echo "[CI_FAIL]"
+        exit 1
+    fi
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+echo "[CI_TIMEOUT]"
+exit 2
+```
+
+Store this script as `/tmp/poll-ci.sh`, make it executable, and invoke
+it with the PR number.
+
+- If `[CI_PASS]` → go to Phase 4.
+- If `[CI_FAIL]` → examine the failed checks, fix the code (switch back
+  to the appropriate engineer role), push fixes, and re‑run polling.
+- If `[CI_TIMEOUT]` → tell the user: "CI still running (timed out after
+  10 min). Say **next** when checks are green."
+
+### Phase 4 — Reviewer
+
+1. Load `.agents/skills/reviewer/SKILL.md`.
+2. Review the PR against the spec (the reviewer skill already knows how).
+3. If the review produces issues with severity ≥ **major**:
+   - Post the review as a PR comment.
+   - Report `[REVIEW_FAIL]`.
+   - (Orchestrator) Switch to the responsible engineer, fix every issue,
+     push, then loop back to Phase 3 (CI) and Phase 4 again.
+4. If the review is clean or only has minor/optional notes:
+   - Output `[REVIEW_PASS]` and proceed.
+
+### Phase 5 — QA
+
+1. Load `.agents/skills/qa/SKILL.md`.
+2. Execute the QA plan (run tests, verify contracts, inspect UI).
+3. Post the QA report as a PR comment.
+4. If `[QA_FAIL]` → switch to the responsible engineer, fix issues,
+   push, then loop back to Phase 3.
+5. If `[QA_PASS]` → proceed.
+
+### Phase 6 — Ready for User
+
+When CI ✅, Reviewer ✅, QA ✅, output the following final message:
+
+```
+🚦 All gates passed.
+
+PR:   #<number>
+Spec: specs/<slug>.md
+Branch: feat/<slug>
+
+- CI:       ✅
+- Reviewer: ✅
+- QA:       ✅
+
+Ready for your final review. Merge when satisfied.
+```
+
+Do **not** merge the PR — only the user does.
+
+### Failing Loops
+
+If the same issue is fixed and fails again more than 3 times, stop and
+ask: "I've attempted to fix <issue> 3 times but it persists. I need
+your guidance."
