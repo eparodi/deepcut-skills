@@ -226,9 +226,18 @@ When creating or modifying CI workflows:
   - ❌ `go-version: "1.22"` (hardcoded)
   - ✅ `go-version-file: backend/go.mod`
 
----
+### 5.5 Docker Log Rotation
 
-## Section 6 — Git & Commit Hygiene
+All services in `docker-compose.yml` MUST include log rotation to prevent
+unbounded disk growth in development and CI:
+
+```yaml
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+```
 
 ### 6.1 Commit & Push
 
