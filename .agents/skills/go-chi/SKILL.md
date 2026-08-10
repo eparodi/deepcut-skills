@@ -588,3 +588,19 @@ Before claiming an endpoint is "stable":
 - [ ] Integration test hits the router with a real request
 - [ ] `go build ./...` and `go vet ./...` pass
 - [ ] Dev-default secrets log a `slog.Warn` at startup
+- [ ] Required env vars documented in a tracked `.env.example` file (Go does not auto-load `.env`)
+
+### Environment Variables — `.env` Not Auto-Loaded
+
+Go's `os.Getenv()` reads from the process environment, NOT from a `.env` file.
+Unlike Node.js (which auto-loads `.env` via Next.js/dotenv), Go needs one of:
+
+- **Docker Compose** (recommended) — reads `.env` and passes vars to the container
+- **Shell source** — `set -a; source .env; set +a; go run ./cmd/server/`
+- **godotenv** — add `github.com/joho/godotenv` and call `godotenv.Load()` at startup
+
+When the backend runs in Docker, `docker compose up -d` recreates the container
+with current `.env` values. `docker compose restart` reuses the old config —
+use `up -d` to pick up `.env` changes.
+
+*Last updated: 2026-08-10*

@@ -253,6 +253,13 @@ When the user asks you to start work:
   ```
   In git-worktree setups where `main` is checked out elsewhere,
   use `git fetch origin main:main` to fast‑forward the ref instead.
+- **Check for port conflicts from other worktrees** before starting dev servers.
+  Git worktrees share the same filesystem but have independent processes. Another
+  worktree's `next dev` or `go run` can occupy the port you need.
+  ```bash
+  lsof -i :3000 -sTCP:LISTEN  # check before starting frontend
+  lsof -i :8081 -sTCP:LISTEN  # check before starting backend
+  ```
 - Branch prefix: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`
 - Use kebab-case: `feat/user-profile-edit`
 - Push the branch immediately so CI runs.
