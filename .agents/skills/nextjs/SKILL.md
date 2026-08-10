@@ -533,6 +533,43 @@ classes. Prefer classes over inline `style={{}}`:
 <div className="bg-surface-raised">
 ```
 
+### DO NOT — Use viewport units for component-internal layout changes
+
+Components should not use `vw`, `vh`, `w-screen`, or `h-screen` to
+implement features that affect page layout (theater mode, expanded view).
+These units ignore the parent container and page structure. Instead:
+
+- Lift the state to the parent component via a callback prop
+- Let the parent decide how to rearrange the layout
+- Use `%`, `flex`, or `max-w-*` within the component to fill available space
+
+```tsx
+// ❌ Wrong — component forces viewport width, breaks all layouts
+<div className={isExpanded ? "!w-screen" : ""}>
+
+// ✅ Right — component expands within parent, parent controls layout
+<div className={isExpanded ? "!max-w-full" : ""}>
+// Parent: <div className={isTheater ? "flex-col" : "lg:flex-row"}>
+```
+
+### DO — Stop both onClick and onDoubleClick on controls inside clickable parents
+
+When a container has `onClick` or `onDoubleClick` handlers, every interactive
+child (button, input, slider) must stop propagation for BOTH event types.
+Stopping only `onClick` still allows `onDoubleClick` to bubble up to the
+parent and trigger unwanted behavior.
+
+```tsx
+// ❌ Wrong — double-click on button triggers parent's onDoubleClick
+<button onClick={(e) => e.stopPropagation()}>
+
+// ✅ Right — both event types are blocked
+<button
+  onClick={(e) => e.stopPropagation()}
+  onDoubleClick={(e) => e.stopPropagation()}
+>
+```
+
 ### Pre-Deploy Checklist
 
 Before opening a PR for a frontend component:
