@@ -217,10 +217,7 @@ After each feature, do a brief retrospective:
 3. What rule was too vague to be useful?
 4. Update the relevant SKILL.md or AGENTS.md.
 
-Keep a `specs/memories/` directory for these retrospectives:
-```
-specs/memories/2026-08-06-feature-x-retro.md
-```
+Keep retros and session logs in your project repo (not in this template).
 
 ---
 

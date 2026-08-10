@@ -324,32 +324,5 @@ features. Specs are git-committed (unlike temporary working docs).
 
 ---
 
-## Section 9 — Session Log & Retros
-
-Every session that involves corrections, bug fixes, or user feedback
-MUST log those events to a session log file so nothing is lost before
-the retro. The retro's job is to trace each correction to a specific
-missing rule and fix that rule.
-
-### 9.1 Session Log
-
-- **File:** `specs/memories/<YYYY-MM-DD>-session-log.md`
-- **Format:** a running table of corrections with root cause + fix,
-  plus a checklist of questions/follow-ups
-- **Update after every correction**, not just at the end
-- One log per day/session
-
-### 9.2 Retro Process
-
-At the end of a feature or session:
-1. Review the session log
-2. For each correction: trace it to the specific rule that was missing
-   (or didn't exist yet)
-3. Update the relevant skill or AGENTS.md with the new rule
-4. Create a retro file: `specs/memories/<YYYY-MM-DD>-<topic>.md`
-5. Cross-link the session log to the retro
-
----
-
 *Last updated: 2026-08-10*
 *These rules apply to all agent threads in this project.*
