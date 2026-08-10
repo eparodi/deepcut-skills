@@ -599,6 +599,60 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8081";
 destination: `${BACKEND_URL}/api/:path*`,
 ```
 
+### WebSocket — Bypass Next.js Proxy
+
+Next.js's built-in proxy (`rewrites` in `next.config.ts` or middleware) handles HTTP
+requests but does **not** support WebSocket upgrade proxying. WebSocket URLs must
+always point directly to the backend:
+
+```ts
+// ❌ Goes through Next.js proxy — WS upgrade fails
+const wsUrl = `ws://localhost:3000/ws/chat/${streamId}`;
+
+// ✅ Points directly to the backend
+const WS_HOST = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:8081";
+const url = new URL(WS_HOST);
+const wsUrl = `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}/ws/chat/${streamId}`;
+```
+
+In production behind a reverse proxy (nginx, Cloudflare) that supports WebSocket
+upgrades at the edge, `WS_HOST` can match the API URL.
+
+### WebSocket — Deduplicate Messages by ID in React State
+
+React StrictMode (development only) double-invokes `useEffect`. If your effect
+opens a WebSocket and the server sends an initial message batch on connect, you'll
+receive the same batch twice — both appended to the same undrained `messages` array.
+Deduplicate by message ID in the `onmessage` handler:
+
+```tsx
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === "message") {
+    setMessages((prev) => {
+      const msg = data.payload;
+      // Skip if we already have this message ID
+      if (prev.some((m) => m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+  }
+};
+```
+
+### HTML — Always Set `type="button"` on Buttons Near Inputs
+
+A `<button>` without an explicit `type` attribute defaults to `type="submit"`.
+Pressing Enter in a nearby `<input>` triggers both your `onKeyDown` handler AND
+the browser's implicit form submission on the submit button, causing double-fires:
+
+```tsx
+// ❌ Enter triggers BOTH onKeyDown AND implicit submit → double-send
+<button onClick={handleSend}>Send</button>
+
+// ✅ Explicit type prevents implicit submission
+<button type="button" onClick={handleSend}>Send</button>
+```
+
 ### React Patterns — `useRef` vs `useState`
 
 When a boolean flag exists only to prevent re-execution of a side effect

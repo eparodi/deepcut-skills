@@ -92,6 +92,11 @@ DeepSeek can sound very sure about incorrect things.
   `User`), no missing fields (e.g., `streamCategory` omitted), correct
   wrapper objects (`{streams, total}` not a bare array). When in doubt,
   grep the type definition in `frontend/src/types/index.ts`.
+- **Bidirectional verification.** When a frontend type includes a nullable
+  field (e.g., `streamId: string | null`), verify the backend actually
+  populates it at the right time. The frontend type is the contract —
+  every nullable field must have a corresponding backend implementation
+  that sets it to non-null under the correct conditions.
 
 ### 2.2 When You DO Need a New Pattern
 
@@ -151,6 +156,13 @@ going to do. This prevents scope creep and clarifies boundaries.
 ### 5.1 Build Verification
 
 - **After any code change, run the build.**
+  ...
+- **After inserting a new parameter into a function, grep all call sites.**
+  When all parameters are the same type (e.g., all `string`), the Go compiler
+  won't catch positional argument errors — only runtime tests will.
+  ```bash
+  grep -r "FunctionName(" --include="*.go" backend/
+  ```
   ```bash
   # Go backend
   cd backend && go build ./...
