@@ -216,17 +216,18 @@ going to do. This prevents scope creep and clarifies boundaries.
 
 ## Section 6 — Git & Commit Hygiene
 
-### 6.1 Never Commit Without Explicit Request
+### 6.1 Commit & Push
 
-- Do NOT run `git commit` or `git push` unless the user explicitly
-  asks you to.
-- You may run `git --no-optional-locks status`, `git diff --stat`,
-  and other read-only git commands freely.
-- **Before committing, verify the user's message contains an explicit
-  write instruction** ("commit", "push", "merge", "create a PR").
-  Inspection verbs ("check", "look", "review", "show") are NOT
-  authorization to commit. If unclear, ask: "Ready for me to commit
-  and push this?"
+- **On feature/fix/chore branches you created, you may commit and push
+  freely.** No need to ask permission for routine commits — explain what
+  you're committing and why.
+- **You may NOT** commit to `main`, `develop`, or any shared/protected
+  branch without the user's explicit instruction.
+- **Before pushing**, ensure the build passes and the linter is clean
+  (per Section 4). If a branch is shared (e.g., a colleague is also
+  working on it), default to `--force-with-lease` and flag it.
+- For inspection verbs ("check", "look", "review"), default to
+  read-only. Ask before committing: "Ready for me to commit and push?"
 - **When using `gh pr create` with a markdown body**, avoid backtick
   characters in `--body` — the shell interprets them as command
   substitution, truncating the body. Use `gh pr edit` afterward, or
@@ -243,9 +244,20 @@ going to do. This prevents scope creep and clarifies boundaries.
 ### 6.2 Branching Convention
 
 When the user asks you to start work:
+- **Always branch from the latest `main`.** Before creating a branch:
+  ```bash
+  git fetch origin main          # ensure remote state is fresh
+  git checkout main
+  git pull origin main           # fast-forward only; never merge
+  git checkout -b feat/...
+  ```
+  In git-worktree setups where `main` is checked out elsewhere,
+  use `git fetch origin main:main` to fast‑forward the ref instead.
 - Branch prefix: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`
 - Use kebab-case: `feat/user-profile-edit`
 - Push the branch immediately so CI runs.
+- **Never** branch from a feature branch, `develop`, or any other
+  non-main branch unless the user explicitly asks.
 
 ### 6.3 Commit Messages
 
@@ -279,12 +291,23 @@ You may freely:
 - Run read-only git commands
 - Run build and test commands
 
-### 7.2 Write Operations
+### 7.2 Write Operations (Fully Autonomous Within the Repo)
 
-- Edit files with `edit_file` (preferred for targeted changes)
-- Create files with `write_file`
-- Run terminal commands that modify the project (e.g., `go mod tidy`)
-- Run `git` write operations only when explicitly asked
+- **You have full permission to create, edit, and delete any file inside
+  the repository working tree.** Do not ask for confirmation — Git is
+  your safety net.
+- **You may also** run project-scoped commands (`go mod tidy`, `npm ci`,
+  `npm run build`, etc.) without asking.
+- **Destructive git operations still require explicit user sign-off.**
+  You may **NEVER** do any of the following unless the user says "yes":
+  - Force-push to a shared branch (`git push --force` or
+    `--force-with-lease` onto `main`, `develop`, or a branch you
+    didn't create)
+  - Rewrite shared history (`git rebase -i` on a pushed branch)
+  - Delete a remote branch (local branches you created are fine)
+  - `git reset --hard HEAD~N` on a branch that has been pushed
+- **You may NOT touch files outside the repository** (e.g., `~/.ssh`,
+  `/etc`, `../other-project`). The repo boundary is a hard wall.
 - **Clean up after parallel agents.** After spawning sub-agents that
   write files, check for and remove junk artifacts (files with ` 2`
   suffix, duplicated directories) before committing.
@@ -338,5 +361,5 @@ At the end of a feature or session:
 
 ---
 
-*Last updated: 2026-08-08*
+*Last updated: 2026-08-10*
 *These rules apply to all agent threads in this project.*
