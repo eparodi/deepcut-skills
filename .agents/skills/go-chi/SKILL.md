@@ -822,8 +822,11 @@ func (h *Handler) writePump(ctx context.Context, conn *websocket.Conn, client *d
 | Unbuffered `Send` channel | `make(chan []byte, 64)` |
 | Blocking broadcast (`c.Send <- data`) | Non-blocking `select/default` |
 | `conn.Close()` without status code | `conn.Close(websocket.StatusNormalClosure, "")` |
-| Manually `json.Marshal` then `conn.Write` | `wsjson.Write(ctx, conn, v)` |
+| Manually `json.Marshal` then `conn.Write` | `wsjson.Write(ctx, conn, v)` for structs; `conn.Write(ctx, websocket.MessageText, data)` for pre-marshaled `[]byte` (avoids double base64-encoding) |
 | Skip `InsecureSkipVerify` for local dev | Use `OriginPatterns: []string{"localhost:3000"}` to validate Origin headers. **Never** use `InsecureSkipVerify: true` — it disables CSWSH protection. |
+| Call `wsjson.Write` from `readPump` goroutine | Route ALL writes through `writePump` via `client.Send` channel — `nhooyr.io/websocket` does not support concurrent writes |
+| Return HTTP error before WebSocket upgrade | **Accept the WebSocket first**, then close with a meaningful code (e.g., `websocket.StatusCode(4001)` for "stream offline") so the browser can receive close codes instead of opaque HTTP errors that trigger infinite reconnect loops |
+| Register WS route inside `AuthMiddleware` when auth is optional | Register outside the auth group, extract credentials manually with `extractToken()`, and allow anonymous connections (read-only) while requiring auth to send messages |
 
 ### Testing WebSocket handlers
 
@@ -858,7 +861,9 @@ func TestWebSocket(t *testing.T) {
 ### Checklist for new WebSocket endpoints
 
 - [ ] Hub is a singleton wired in `main.go` (not created per-request)
-- [ ] Route registered inside an `AuthMiddleware` group
+- [ ] Route registered OUTSIDE `AuthMiddleware` if auth is optional; extract credentials manually
+- [ ] WebSocket accepted BEFORE application-level validation (so close codes reach the browser)
+- [ ] All writes routed through single `writePump` goroutine via `client.Send` channel
 - [ ] `Send` channel is buffered (`make(chan []byte, 64)`)
 - [ ] Broadcast uses non-blocking `select/default`
 - [ ] Context derived from `context.Background()`, not `r.Context()`
@@ -868,6 +873,7 @@ func TestWebSocket(t *testing.T) {
 - [ ] All injected dependencies nil-checked before use (hub, services)
 - [ ] Write goroutine has `defer recover()` for panic safety
 - [ ] Test uses `httptest.NewServer` + `websocket.Dial`
+- [ ] Test passes auth via `HTTPHeader` or context injection when WS route is outside auth group
 
 ### Third-Party Webhooks (SRS callbacks, Stripe, etc.)
 
