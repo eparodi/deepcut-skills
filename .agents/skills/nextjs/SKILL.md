@@ -546,6 +546,21 @@ Before opening a PR for a frontend component:
 - [ ] At minimum a render test for each component
 - [ ] Vitest config uses `fileURLToPath` for cross-platform path aliases (not `.pathname`)
 - [ ] All vitest functions (`describe`, `it`, `expect`, `vi`, `beforeEach`, `afterEach`) imported explicitly — do not rely on `globals: true`
+- [ ] No hardcoded external URLs in `next.config.ts` — use env vars with sensible defaults (see Config Files section)
+
+### Config Files — Never Hardcode External URLs
+
+Any external service URL in `next.config.ts` (rewrite destinations, image domains,
+etc.) must be configurable via an environment variable, never hardcoded:
+
+```ts
+// ❌ Hardcoded — breaks in any environment other than local
+destination: "http://localhost:8081/api/:path*",
+
+// ✅ Configurable — works in dev, staging, and production
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8081";
+destination: `${BACKEND_URL}/api/:path*`,
+```
 
 ### React Patterns — `useRef` vs `useState`
 
@@ -583,4 +598,4 @@ const Mock = (props: Props) => <div>{props.used}</div>;
 Alternatively, configure `argsIgnorePattern: "^_"` in `eslint.config` to
 enable underscore-prefix suppression globally.
 
-*Last updated: 2026-08-09*
+*Last updated: 2026-08-10*
