@@ -13,9 +13,13 @@ role skill loaded:
 | Backend Eng | `backend-engineer` | `backend/` | ✅ | DeepSeek-V4 | Claude Opus* |
 | Frontend Eng | `frontend-engineer` | `frontend/` | ✅ | DeepSeek-V4 | — |
 | Mobile Eng | `mobile-engineer` | `mobile/` | ✅ | DeepSeek-V4 | — |
+| Reviewer | `reviewer` | ❌ | ✅ | DeepSeek-V4 | Claude Opus* |
+| QA | `qa` | ❌ | ✅ | DeepSeek-V4 | — |
+| Security Eng | `security-engineer` | ❌ | ✅ | DeepSeek-V4 | Claude Opus* |
 
 *Use stronger model for architecture decisions, complex type design,
-and cross-cutting refactors. DeepSeek is fine for routine implementation.
+cross-cutting refactors, and security audits. DeepSeek is fine for
+routine implementation.
 
 ---
 
@@ -184,6 +188,7 @@ If any role encounters ambiguity in the spec:
   once both the API contract and UI design are stable
 - PM, Architect, and UX Designer can plan the NEXT feature while
   engineers implement the current one
+- QA and Security Engineer audit the PR in parallel before final approval
 
 ---
 
