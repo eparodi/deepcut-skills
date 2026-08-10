@@ -166,22 +166,14 @@ going to do. This prevents scope creep and clarifies boundaries.
 - Run targeted tests for the code you changed. If you changed a handler,
   run that handler's tests. Escalate to the full suite only when
   relevant.
-- **Node projects: verify Node version matches `.nvmrc`** before any
-  `npm` or `node` command. The agent shell does not auto-load nvm. If the
+- **Frontend: verify Node version matches `.nvmrc`** before any `npm`
+  or `node` command. The agent shell does not auto-load nvm. If the
   active Node version doesn't match, prefix commands with the nvm path:
   ```bash
   node --version  # verify before proceeding
   # If mismatch, use:
   PATH="$HOME/.nvm/versions/node/v$(cat .nvmrc)/bin:$PATH" npm install
   ```
-
-- **Verify call sites before changing signatures.** Before changing a
-  function signature (adding/removing parameters, changing types), grep
-  all call sites and update every one in the same commit.
-  ```bash
-  grep -r "FunctionName(" --include="*.go" backend/
-  ```
-  Broken callers in test files are still broken callers.
 
 ### 5.2 Test Coverage
 
@@ -212,6 +204,28 @@ going to do. This prevents scope creep and clarifies boundaries.
   cd backend && go vet ./...
   ```
 
+### 5.4 CI/CD Conventions
+
+When creating or modifying CI workflows:
+
+- **Pin tool versions.** Every CLI tool installed in CI must use an exact
+  version, never `@latest`. This includes `go install`, `npm install -g`,
+  and any direct binary downloads.
+  - ❌ `go install example.com/cmd/tool@latest`
+  - ✅ `go install example.com/cmd/tool@v1.2.3`
+
+- **Verify binary integrity.** Downloaded binaries must be checksum-verified
+  or installed via a package manager (`go install`, `npm ci`, `apt`). Avoid
+  `curl | bash` and `curl | tar | sudo mv` patterns.
+  - ❌ `curl -L url | tar xvz && sudo mv binary /usr/local/bin`
+  - ✅ `go install example.com/cmd/tool@v1.2.3`
+
+- **Source versions from project files.** Go version must be read from
+  `go.mod` via `go-version-file`, not hardcoded. Node version must be read
+  from `.nvmrc` via `node-version-file`.
+  - ❌ `go-version: "1.22"` (hardcoded)
+  - ✅ `go-version-file: backend/go.mod`
+
 ---
 
 ## Section 6 — Git & Commit Hygiene
@@ -224,22 +238,10 @@ going to do. This prevents scope creep and clarifies boundaries.
 - **You may NOT** commit to `main`, `develop`, or any shared/protected
   branch without the user's explicit instruction.
 - **Before pushing**, ensure the build passes and the linter is clean
-  (per Section 4). If a branch is shared (e.g., a colleague is also
+  (per Section 5). If a branch is shared (e.g., a colleague is also
   working on it), default to `--force-with-lease` and flag it.
 - For inspection verbs ("check", "look", "review"), default to
   read-only. Ask before committing: "Ready for me to commit and push?"
-- **When using `gh pr create` with a markdown body**, avoid backtick
-  characters in `--body` — the shell interprets them as command
-  substitution, truncating the body. Use `gh pr edit` afterward, or
-  write the body to a file and use `--body-file`.
-  ```bash
-  # Shell eats backticks in --body
-  gh pr create --title "..." --body "use \`SetupDB()\`"  # broken
-
-  # Write to a file instead
-  echo 'use `SetupDB()`' > /tmp/body.md
-  gh pr create --title "..." --body-file /tmp/body.md
-  ```
 
 ### 6.2 Branching Convention
 
@@ -253,13 +255,6 @@ When the user asks you to start work:
   ```
   In git-worktree setups where `main` is checked out elsewhere,
   use `git fetch origin main:main` to fast‑forward the ref instead.
-- **Check for port conflicts from other worktrees** before starting dev servers.
-  Git worktrees share the same filesystem but have independent processes. Another
-  worktree's `next dev` or `go run` can occupy the port you need.
-  ```bash
-  lsof -i :3000 -sTCP:LISTEN  # check before starting frontend
-  lsof -i :8081 -sTCP:LISTEN  # check before starting backend
-  ```
 - Branch prefix: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`
 - Use kebab-case: `feat/user-profile-edit`
 - Push the branch immediately so CI runs.
@@ -272,18 +267,6 @@ When the user asks you to start work:
   `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`
 - Body explains WHY, not just WHAT.
 - Keep subject line under 72 characters.
-
-### 6.4 CI/CD Conventions
-
-When creating or modifying CI workflows:
-
-- **Check for existing workflows before creating new ones.** If a CI
-  workflow for the same stack already exists (e.g., `backend-ci.yml`),
-  modify it rather than creating a competing file. Two workflows with
-  overlapping path triggers cause duplicate CI runs.
-  ```bash
-  ls .github/workflows/
-  ```
 
 ---
 
