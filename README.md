@@ -56,9 +56,9 @@ Follow `HOW_WE_WORK.md`. The gist:
 
 ### 5. Iterate
 
-After each feature, trace any agent mistakes to the specific missing
-or weak rule, then tighten it. The rules get better with every feature.
-Keep retros and session logs in your project repo (not in this template).
+After each feature, write a retro in `specs/memories/` tracing any
+agent mistakes to the specific missing or weak rule, then tighten it.
+The rules get better with every feature.
 
 ## Per-Feature Walkthrough
 
@@ -199,6 +199,7 @@ with the correct alternative.
 |------|---------|
 | `zed/profiles.json` | Agent profiles with tool-level guardrails and model recommendations |
 | `HOW_WE_WORK.md` | Day-to-day workflow: thread setup, handoff protocols, parallel vs sequential, model cost levers |
+| `specs/memories/README.md` | Retro template for iterating on skills after each feature |
 
 ### Reference Research (`docs/`)
 
@@ -215,7 +216,8 @@ your-monorepo/
 ├── zed/
 │   └── profiles.json                 # Zed agent profile config
 ├── specs/                            # Single source of truth
-│   └── <feature-slug>.md             # Living specs (phases 1-4)
+│   ├── <feature-slug>.md             # Living specs (phases 1-4)
+│   └── memories/                     # Retros: trace agent mistakes to rules
 ├── .agents/
 │   └── skills/
 │       ├── spec-driven/SKILL.md      # Gated spec-first workflow
@@ -256,14 +258,13 @@ This system is designed to improve with use:
 
 1. Run a feature end-to-end
 2. The agent makes a mistake
-3. Trace the mistake to the specific missing or weak rule
+3. Write a retro: what was the mistake? Which rule should have caught it?
 4. Tighten that specific rule
-5. Commit the updated rule
+5. Commit both the retro and the updated rule
 6. Next feature, that mistake doesn't happen
 
-Keep retros and session logs in your project repo to maintain the
-traceability chain: "we added this rule because of this transcript
-on this date."
+`specs/memories/` holds the traceability chain: "we added this rule
+because of this transcript on this date."
 
 ## License
 
