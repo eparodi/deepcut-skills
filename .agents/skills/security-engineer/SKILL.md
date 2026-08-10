@@ -177,7 +177,10 @@ grep -rn "dangerouslySetInnerHTML\|innerHTML" --include="*.tsx" .
 - [ ] Error responses do NOT leak stack traces or internal details.
 - [ ] All endpoints return appropriate HTTP status codes.
 - [ ] WebSocket endpoints authenticate before upgrading.
-- [ ] WebSocket connections have origin validation enabled.
+- [ ] WebSocket connections use `OriginPatterns`, **never** `InsecureSkipVerify: true`.
+- [ ] Management/API ports (e.g., SRS 1985) are NOT exposed in docker-compose.
+- [ ] Callback/webhook auth is always enforced; never skip-when-empty.
+- [ ] HLS/stream URLs do NOT expose raw stream keys (use hash or UUID paths).
 
 ### 5. Dependency & Supply Chain
 

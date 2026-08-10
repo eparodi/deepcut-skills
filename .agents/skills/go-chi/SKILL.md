@@ -9,69 +9,62 @@ You are writing Go code using net/http stdlib + chi router v5. Follow
 these conventions exactly. When DeepSeek suggests something that
 contradicts this document, trust this document.
 
-## Project Layout — Modular Monolith (Hexagonal Architecture)
+## Project Layout (Monorepo)
 
 ```
 backend/
 ├── cmd/
 │   └── server/
-│       └── main.go                  # Entry point, wires all modules
+│       └── main.go            # Entry point, wires everything
 ├── internal/
-│   ├── shared/                      # Shared kernel
-│   │   ├── errs/errors.go           # AppError types
-│   │   └── render/render.go         # JSON helpers
-│   └── modules/                     # One directory per domain
-│       ├── auth/                    # Auth module
-│       │   ├── domain/
-│       │   │   ├── entity.go        # User
-│       │   │   └── repository.go    # Repository interface (port)
-│       │   ├── application/
-│       │   │   └── service.go       # Business logic
-│       │   └── adapter/
-│       │       ├── http/
-│       │       │   └── handler.go   # HTTP handlers + RegisterRoutes
-│       │       └── postgres/
-│       │           └── repo.go      # Implements domain.Repository
-│       ├── streams/                 # Streams module
-│       │   ├── domain/
-│       │   │   ├── entity.go        # Stream, LiveStream
-│       │   │   └── repository.go    # Repository interface
-│       │   ├── application/
-│       │   │   └── service.go
-│       │   └── adapter/
-│       │       ├── http/handler.go
-│       │       └── postgres/repo.go
-│       ├── chat/                    # Chat module
-│       │   └── ...
-│       └── vods/                    # VODs module
-│           └── ...
+│   ├── handler/               # HTTP handlers (one file per resource)
+│   │   ├── users.go
+│   │   ├── products.go
+│   │   └── routes.go          # chi route registration
+│   ├── service/               # Business logic
+│   │   ├── users.go
+│   │   └── products.go
+│   ├── store/                 # Data access (database, external APIs)
+│   │   ├── postgres/
+│   │   │   ├── queries/       # sqlc query files (.sql)
+│   │   │   ├── db.go          # pgxpool setup
+│   │   │   ├── models.go      # sqlc-generated (DO NOT EDIT)
+│   │   │   └── querier.go     # sqlc-generated interface
+│   │   │   ├── users.go       # Repository methods
+│   │   │   └── products.go
+│   │   └── memstore/          # In-memory store for tests
+│   ├── middleware/             # Custom middleware
+│   │   ├── auth.go
+│   │   ├── logging.go
+│   │   └── requestid.go
+│   ├── model/                 # Domain types (shared across layers)
+│   │   ├── user.go
+│   │   └── product.go
+│   ├── errs/                  # Custom error types
+│   │   └── errors.go
+│   └── config/                # Configuration
+│       └── config.go
 ├── db/
-│   └── migrations/
-└── go.mod
-```
+│   └── migrations/            # golang-migrate SQL files
+│       ├── 000001_create_users.up.sql
+│       └── 000001_create_users.down.sql
 ├── go.mod
 ├── go.sum
 └── Makefile
 ```
 
-### Layer Rules (Hexagonal)
+### Layer Rules
 
-| Layer | Location | Can import | Must NOT import |
-|-------|----------|-----------|-----------------|
-| Domain | `modules/<name>/domain/` | `shared/errs` | `application`, `adapter`, `net/http`, `database/sql` |
-| Application | `modules/<name>/application/` | `domain`, `shared/errs` | `adapter`, `net/http`, `database/sql` |
-| Adapter (HTTP) | `modules/<name>/adapter/http/` | `application`, `shared/errs`, `shared/render` | `adapter/postgres` directly |
-| Adapter (Postgres) | `modules/<name>/adapter/postgres/` | `domain` (to implement interfaces) | `application`, `adapter/http`, `net/http` |
-| Shared | `shared/` | nothing (or stdlib only) | any module |
+| Layer | Directory | Can import | Must NOT import |
+|-------|-----------|-----------|-----------------|
+| Handler | `internal/handler/` | `service`, `model`, `errs`, `middleware` | `store` directly |
+| Service | `internal/service/` | `store`, `model`, `errs` | `handler`, `net/http` |
+| Store | `internal/store/` | `model`, `errs` | `handler`, `service`, `net/http` |
+| Model | `internal/model/` | nothing | `handler`, `service`, `store` |
 
-**Key rules:**
-- Repository interfaces are defined in `domain/` (ports)
-- Postgres adapters implement those interfaces
-- Services accept interfaces, never concrete *postgres.Repo
-- Handlers call services only, never repositories directly
-- Each module registers its own routes via `RegisterRoutes(chi.Router, ...)`
-- No cross-module domain imports — if a module needs another module's data,
-  define a local port (minimal interface) or go through the application layer
+**Rule:** Handlers parse HTTP, services enforce business rules, stores
+talk to databases. A handler never opens a database connection. A service
+never parses an HTTP request body.
 
 ## chi Router Patterns
 
@@ -301,10 +294,12 @@ if errors.As(err, &appErr) {
 | Panic in handler | Return error; Recoverer middleware catches panics |
 | `errors.New("user not found")` | `errs.NotFound("user %s not found", id)` |
 | `_ = someFunc()` (discard error) | At minimum `slog.Error("op failed", "err", err)`. If the error is truly non-critical, log it. |
+| Return `errs.NotFound` for "no active stream to end" | Return `errs.Conflict` — the user exists, but their state (not-live) prevents the operation. 409 is semantically correct for state conflicts. |
+| Return `errs.NotFound` when the resource exists but in wrong state | Use `errs.Conflict("no active stream to end")`. NotFound should be reserved for truly missing resources (wrong user ID, deleted entity). |
 
 **Bare error returns are banned.** Every error crossing a layer boundary must be wrapped with context. This is not optional — unwrapped errors make debugging production incidents near-impossible.
 
-**Silently discarded errors (`_ =`) are banned.** If a function returns an error you genuinely don't care about, log it at WARN or ERROR level. Silent data loss is worse than a noisy log.
+**Silently discarded errors (`_ =`) are banned.** If a function returns an error you genuinely don't care about (analytics update during stream-end cleanup), log it at WARN or ERROR level. Silent data loss is worse than a noisy log.
 
 ## Testing
 
@@ -423,6 +418,40 @@ if err := decoder.Decode(&input); err != nil {
 | `json.Marshal` in handler | `json.NewEncoder(w).Encode(v)` (streams) |
 | Ignore JSON syntax errors | Switch on `*json.SyntaxError`, `*json.UnmarshalTypeError` |
 | `interface{}` for partial JSON | Define a typed struct even for partial data |
+
+### DO — Match response shapes to frontend contract
+
+**Rule:** Before writing a handler response struct, read the frontend TypeScript type from `frontend/src/types/index.ts`. The Go `json` tags must match the TypeScript field names **exactly**. The JSON response shape (wrapper objects, arrays vs. single objects) must match what the frontend expects.
+
+```go
+// ✅ Frontend type: { streams: LiveStream[]; total: number }
+// Go handler:
+render.JSON(w, http.StatusOK, map[string]any{
+    "streams": streams,
+    "total":   len(streams),
+})
+
+// ❌ Wrong: bare array
+render.JSON(w, http.StatusOK, streams) // Frontend expects LiveStreamsResponse, not LiveStream[]
+
+// ❌ Wrong: generic success response when frontend expects echoed fields
+render.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+// Frontend expects: { streamTitle: string; streamCategory: string | null }
+```
+
+| ❌ Wrong | ✅ Right |
+|---|---|
+| Return bare array when frontend expects `{streams, total}` wrapper | Wrap in the response struct the frontend type defines |
+| Return `{"status":"ok"}` when frontend expects echoed fields | Return the fields the frontend expects (e.g., `{streamTitle, streamCategory}`) |
+| Include extra fields not in the frontend type (e.g., `createdAt` when not in `User`) | Only include fields present in the frontend TypeScript interface |
+| Omit fields that the frontend type declares (e.g., missing `streamCategory`) | Include all fields from the frontend type, even if `null` |
+| Guess field names from database column names | Read `frontend/src/types/index.ts` and use the exact camelCase key names |
+
+**Pre-implementation checklist for every handler response:**
+1. `grep` the interface name in `frontend/src/types/index.ts`
+2. Copy every field name into your Go struct tags (camelCase, exactly)
+3. Verify wrapper objects match (is it `T` or `{items: T[]; total: N}`?)
+4. Verify optional fields use `*string` + `omitempty` when the frontend type has `?:`
 
 ## Context Propagation
 
@@ -573,6 +602,273 @@ func (s *Store) WithTx(ctx context.Context, fn func(*Queries) error) error {
 | `w.WriteHeader(200)` after `w.Write()` | Set status code BEFORE writing body |
 | Return 200 then write error body | Check errors FIRST, then write success OR error |
 
+## WebSocket (nhooyr.io/websocket)
+
+This project uses **`nhooyr.io/websocket`** — not gorilla/websocket.
+The library is already in `go.mod`. Do NOT introduce gorilla/websocket.
+
+### Hub Pattern — Room-based broadcast
+
+Every WebSocket feature follows this pattern: a **Hub** (singleton, wired
+in `main.go`) manages rooms. Handlers upgrade connections and delegate
+read/write to the hub.
+
+```go
+// domain/entity.go — shared across layers
+type Client struct {
+    UserID string
+    Send   chan []byte  // buffered channel (64 is a safe default)
+}
+```
+
+```go
+// application/hub.go — singleton, safe for concurrent use
+type Hub struct {
+    mu    sync.RWMutex
+    rooms map[string]map[*domain.Client]bool // roomID → clients
+}
+
+func NewHub() *Hub {
+    return &Hub{rooms: make(map[string]map[*domain.Client]bool)}
+}
+
+// Join adds a client to a room. Call from the handler after upgrade.
+func (h *Hub) Join(roomID string, c *domain.Client) {
+    h.mu.Lock()
+    defer h.mu.Unlock()
+    if h.rooms[roomID] == nil {
+        h.rooms[roomID] = make(map[*domain.Client]bool)
+    }
+    h.rooms[roomID][c] = true
+}
+
+// Leave removes a client. Always defer after Join.
+func (h *Hub) Leave(roomID string, c *domain.Client) {
+    h.mu.Lock()
+    defer h.mu.Unlock()
+    delete(h.rooms[roomID], c)
+    if len(h.rooms[roomID]) == 0 {
+        delete(h.rooms, roomID)
+    }
+}
+
+// Broadcast sends a message to every client in a room.
+// Uses non-blocking send: if a client's buffer is full, skip it.
+func (h *Hub) Broadcast(roomID string, data []byte) {
+    h.mu.RLock()
+    defer h.mu.RUnlock()
+    for c := range h.rooms[roomID] {
+        select {
+        case c.Send <- data:
+        default: // client too slow, drop
+        }
+    }
+}
+```
+
+### Handler — Upgrade + read/write pumps
+
+```go
+// adapter/http/handler.go
+import "nhooyr.io/websocket"
+import "nhooyr.io/websocket/wsjson"
+
+func (h *Handler) MyWebSocket(w http.ResponseWriter, r *http.Request) {
+    roomID := chi.URLParam(r, "roomID")
+
+    conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+        InsecureSkipVerify: true, // allow non-browser clients (OBS, scripts)
+    })
+    if err != nil {
+        h.logger.Error("ws accept", "error", err)
+        return
+    }
+    defer conn.Close(websocket.StatusNormalClosure, "")
+
+    client := &domain.Client{
+        UserID: "...", // from auth or query param
+        Send:   make(chan []byte, 64),
+    }
+
+    h.hub.Join(roomID, client)
+    defer h.hub.Leave(roomID, client)
+
+    // Context for the connection lifetime. NOT derived from r.Context().
+    ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+    defer cancel()
+
+    go h.readPump(ctx, conn, client)
+    h.writePump(ctx, conn, client)
+}
+
+func (h *Handler) readPump(ctx context.Context, conn *websocket.Conn, client *domain.Client) {
+    defer conn.Close(websocket.StatusNormalClosure, "")
+    for {
+        _, msg, err := conn.Read(ctx)
+        if err != nil { break }
+        // process msg, call service, broadcast via hub
+        h.hub.Broadcast(roomID, msg)
+    }
+}
+
+func (h *Handler) writePump(ctx context.Context, conn *websocket.Conn, client *domain.Client) {
+    for {
+        select {
+        case data, ok := <-client.Send:
+            if !ok { return }
+            wsjson.Write(ctx, conn, data) // or conn.Write(ctx, websocket.MessageText, data)
+        case <-ctx.Done():
+            return
+        }
+    }
+}
+```
+
+### DO — WebSocket patterns
+
+- **Always derive a new context** for the connection lifetime. Never pass
+  `r.Context()` into goroutines — the HTTP request context is cancelled
+  when the handler returns.
+  ```go
+  ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+  defer cancel()
+  ```
+
+- **Buffer the Send channel** (64 is a good default). Unbuffered channels
+  block the broadcaster if a single client is slow.
+  ```go
+  Send: make(chan []byte, 64)
+  ```
+
+- **Non-blocking broadcast.** The `select/default` pattern prevents a slow
+  client from stalling the entire room.
+  ```go
+  select {
+  case c.Send <- data:
+  default: // drop, client will catch up or reconnect
+  }
+  ```
+
+- **Always `defer conn.Close()`** with a status code. `StatusNormalClosure`
+  (1000) for clean shutdown, `StatusInternalError` (1011) for unexpected
+  errors.
+
+- **Use `wsjson.Write`** for structured JSON messages. It's simpler than
+  marshalling manually.
+  ```go
+  wsjson.Write(ctx, conn, myStruct)
+  ```
+
+- **Wire the hub in `main.go`** and pass it to the handler.
+  ```go
+  hub := chatapp.NewChatHub(chatRepo, logger)
+  chatSvc := chatapp.NewChatService(chatRepo, hub)
+  chatHandler := chathttp.NewChatHandler(chatSvc, logger)
+  ```
+
+### DO NOT — WebSocket traps
+
+| ❌ Wrong | ✅ Right |
+|---|---|
+| `import "github.com/gorilla/websocket"` | `import "nhooyr.io/websocket"` |
+| Pass `r.Context()` to WebSocket goroutines | `context.WithTimeout(context.Background(), 24*time.Hour)` |
+| Unbuffered `Send` channel | `make(chan []byte, 64)` |
+| Blocking broadcast (`c.Send <- data`) | Non-blocking `select/default` |
+| `conn.Close()` without status code | `conn.Close(websocket.StatusNormalClosure, "")` |
+| Manually `json.Marshal` then `conn.Write` | `wsjson.Write(ctx, conn, v)` |
+| Skip `InsecureSkipVerify` for local dev | Use `OriginPatterns: []string{"localhost:3000"}` to validate Origin headers. **Never** use `InsecureSkipVerify: true` — it disables CSWSH protection. |
+
+### Testing WebSocket handlers
+
+Use `httptest.NewServer` to test end-to-end:
+
+```go
+func TestWebSocket(t *testing.T) {
+    hub := NewHub()
+    h := NewHandler(hub, testLogger())
+
+    r := chi.NewRouter()
+    r.Get("/ws/{roomID}", h.MyWebSocket)
+    ts := httptest.NewServer(r)
+    defer ts.Close()
+
+    wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws/room-1"
+    conn, _, err := websocket.Dial(context.Background(), wsURL, nil)
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer conn.Close(websocket.StatusNormalClosure, "")
+
+    // Write a message
+    conn.Write(context.Background(), websocket.MessageText, []byte(`{"key":"val"}`))
+
+    // Read the response
+    _, msg, err := conn.Read(context.Background())
+    // ... assertions ...
+}
+```
+
+### Checklist for new WebSocket endpoints
+
+- [ ] Hub is a singleton wired in `main.go` (not created per-request)
+- [ ] Route registered inside an `AuthMiddleware` group
+- [ ] `Send` channel is buffered (`make(chan []byte, 64)`)
+- [ ] Broadcast uses non-blocking `select/default`
+- [ ] Context derived from `context.Background()`, not `r.Context()`
+- [ ] `defer conn.Close(websocket.StatusNormalClosure, "")`
+- [ ] `defer hub.Leave(...)` after `hub.Join(...)`
+- [ ] `AcceptOptions` uses `OriginPatterns`, NOT `InsecureSkipVerify`
+- [ ] All injected dependencies nil-checked before use (hub, services)
+- [ ] Write goroutine has `defer recover()` for panic safety
+- [ ] Test uses `httptest.NewServer` + `websocket.Dial`
+
+### Third-Party Webhooks (SRS callbacks, Stripe, etc.)
+
+When handling webhook callbacks from external services:
+
+- **Do NOT use `DisallowUnknownFields()`** — third-party services often send
+  extra metadata fields not relevant to your handler. Blocking them causes
+  the entire webhook to fail silently.
+  ```go
+  // ❌ Rejects SRS callback because it sends ip, vhost, app, etc.
+  dec.DisallowUnknownFields()
+
+  // ✅ Only decode the fields you need, ignore the rest.
+  var body struct {
+      Action   string `json:"action"`
+      ClientID int    `json:"client_id"`
+      Stream   string `json:"stream"`
+  }
+  dec := json.NewDecoder(r.Body)
+  dec.Decode(&body)
+  ```
+
+- **Match your struct to the actual payload**, not what you assume.
+  Read the service's documentation for the exact JSON field names.
+  Test with a real payload from the service (capture it once, use it
+  in a table-driven test).
+
+- **Verify file paths in the actual container.** Config directives like
+  `hls_path /data/hls` may be overridden by Docker image defaults.
+  Run `docker compose exec <svc> find / -name "*.m3u8"` to find where
+  files actually land.
+
+### Nil Guards for Injected Dependencies
+
+Services that accept dependencies via constructor injection (hub, repos,
+HTTP clients) must nil-check them before use — tests often construct
+services with `nil` for unused dependencies.
+
+```go
+func (s *StreamService) OnStreamStart(...) {
+    // ...
+    if s.hub != nil {
+        s.hub.NotifyStreamStarted(userID, stream.ID)
+    }
+    // ...
+}
+```
+
 ### Pre-Deploy Checklist
 
 Before claiming an endpoint is "stable":
@@ -588,19 +884,6 @@ Before claiming an endpoint is "stable":
 - [ ] Integration test hits the router with a real request
 - [ ] `go build ./...` and `go vet ./...` pass
 - [ ] Dev-default secrets log a `slog.Warn` at startup
-- [ ] Required env vars documented in a tracked `.env.example` file (Go does not auto-load `.env`)
-
-### Environment Variables — `.env` Not Auto-Loaded
-
-Go's `os.Getenv()` reads from the process environment, NOT from a `.env` file.
-Unlike Node.js (which auto-loads `.env` via Next.js/dotenv), Go needs one of:
-
-- **Docker Compose** (recommended) — reads `.env` and passes vars to the container
-- **Shell source** — `set -a; source .env; set +a; go run ./cmd/server/`
-- **godotenv** — add `github.com/joho/godotenv` and call `godotenv.Load()` at startup
-
-When the backend runs in Docker, `docker compose up -d` recreates the container
-with current `.env` values. `docker compose restart` reuses the old config —
-use `up -d` to pick up `.env` changes.
-
-*Last updated: 2026-08-10*
+- [ ] Response shape verified against frontend types: `grep -A 20 "interface <Name>" frontend/src/types/index.ts` — all fields present, no extra fields, wrapper objects match
+- [ ] HTTP status codes are semantically correct: 409 for state conflicts (not 404), 400 for validation (not 500)
+- [ ] All handler inputs validated: required fields checked, enums checked, lengths checked — validation lives in the handler (HTTP layer), not the service

@@ -49,6 +49,24 @@ cd mobile && npx jest --ci --reporters=default
 
 Record the results. Any failing test is a **blocker**.
 
+### 2b. Docker Build Cache Verification
+
+When changes involve Dockerized services, verify the build isn't cached:
+```bash
+# Rebuild with no cache to ensure code changes are actually deployed
+docker compose build --no-cache <service>
+```
+
+### 2c. Config File Verification
+
+For infrastructure config (SRS, nginx, etc.):
+- Verify the config file name matches what the Docker image actually loads
+  (e.g., `ossrs/srs:5` uses `docker.conf`, not `srs.conf`)
+- Check actual file paths inside the container match config values:
+  ```bash
+  docker compose exec <svc> find / -name "*.m3u8" 2>/dev/null
+  ```
+
 ### 3. API contract verification (backend ↔ frontend)
 
 - Grep the shared TypeScript types used by the frontend:
