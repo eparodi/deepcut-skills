@@ -66,7 +66,54 @@ backend/
 talk to databases. A handler never opens a database connection. A service
 never parses an HTTP request body.
 
-## chi Router Patterns
+### Service Logging
+
+**Rule:** Services MUST use injected `*slog.Logger`, never the global `slog`
+package functions. This ensures log output respects the configured handler
+and log level, and allows tests to control verbosity by passing `nil`.
+
+```go
+// ✅ Right: injected logger
+type MyService struct {
+    logger *slog.Logger
+}
+
+func NewMyService(..., logger *slog.Logger) *MyService {
+    return &MyService{..., logger: logger}
+}
+
+// Nil-safe helper for optional logging in tests
+func (s *MyService) infoLog(msg string, args ...any) {
+    if s.logger != nil {
+        s.logger.Info(msg, args...)
+    }
+}
+
+// ❌ Wrong: global slog bypasses configured handler/level
+func (s *MyService) doWork() {
+    slog.Info("work done")
+}
+```
+
+### Log Level Configuration
+
+**Rule:** `main.go` MUST support a `LOG_LEVEL` environment variable.
+Supported values: `debug`, `info` (default), `warn`, `error`.
+
+```go
+func newLogger() *slog.Logger {
+    level := slog.LevelInfo
+    switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
+    case "debug":
+        level = slog.LevelDebug
+    case "warn":
+        level = slog.LevelWarn
+    case "error":
+        level = slog.LevelError
+    }
+    return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+}
+```
 
 ### DO — Standard route registration
 
