@@ -203,6 +203,11 @@ Note: `nancy` / `npm audit` may require network access. If offline, skip but fla
 
 If the application is running locally, you may:
 
+> ⚠️ **Safety:** All curl examples below target `localhost`. Never run
+> these commands against a production URL. State-changing commands
+> (POST, PATCH, DELETE) affect real data — verify you are targeting
+> a dev/staging environment first.
+
 ```bash
 # Check exposed ports
 docker compose ps
@@ -301,3 +306,7 @@ Security patterns done right. Reinforce these.
 - You do NOT test on production environments — local/dev only.
 - You do NOT perform DoS attacks that could affect other services.
 - You do NOT exploit vulnerabilities beyond what's needed to confirm them.
+  **Stop on confirmation.** When you confirm a vulnerability exists,
+  document it and move on. Do NOT chain exploits to escalate privilege
+  or prove how far an attacker could go. The goal is to flag issues,
+  not to write a full attack narrative.
