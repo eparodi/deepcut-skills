@@ -11,9 +11,9 @@ This project front-loads quality by enforcing **spec-first planning** and
 **role-based guardrails** so misunderstandings get caught in cheap markdown
 edits instead of expensive code rewrites.
 
-It simulates a six-person team — PM, Architect, UX Designer, and three
-Engineers — each in its own Zed agent thread, coordinated through a shared
-`specs/` directory.
+It simulates a nine-person team — PM, Architect, UX Designer, three
+Engineers, Reviewer, QA, and Security Engineer — each in its own Zed
+agent thread, coordinated through a shared `specs/` directory.
 
 ## Quick Start
 
@@ -41,6 +41,9 @@ Open one Zed agent thread per role. Load the corresponding skill:
 | Backend Eng | `backend-engineer` + `go-chi` | `@backend-engineer @go-chi` |
 | Frontend Eng | `frontend-engineer` + `nextjs` | `@frontend-engineer @nextjs` |
 | Mobile Eng | `mobile-engineer` + `expo` | `@mobile-engineer @expo` |
+| Reviewer | `reviewer` | `@reviewer` |
+| QA | `qa` | `@qa` |
+| Security Eng | `security-engineer` | `@security-engineer` |
 
 ### 4. Walk through the phases
 
@@ -133,6 +136,8 @@ Implement task 5.
 | 4 | Backend | `@backend-engineer @go-chi @spec-driven` | "Implement task N from spec X" |
 | 4 | Frontend | `@frontend-engineer @nextjs @spec-driven` | "Implement task N from spec X" |
 | 4 | Mobile | `@mobile-engineer @expo @spec-driven` | "Implement task N from spec X" |
+| 5a | QA | `@qa` | "Validate PR #N against spec X" |
+| 5b | Security | `@security-engineer` | "Audit PR #N for vulnerabilities" |
 
 ## What's Included
 
@@ -154,7 +159,7 @@ A four-phase, gated process with human checkpoints between phases:
 Requirements → [approve] → Design → [approve] → Tasks → Implement
 ```
 
-### Six Role Skills
+### Nine Role Skills
 
 | Role | Skill | Owns | Can Write Code? |
 |------|-------|------|:---:|
@@ -164,8 +169,11 @@ Requirements → [approve] → Design → [approve] → Tasks → Implement
 | **Backend Eng** | `backend-engineer` | `backend/` — Go/chi, database, API implementation | ✅ |
 | **Frontend Eng** | `frontend-engineer` | `frontend/` — Next.js App Router, Server Components | ✅ |
 | **Mobile Eng** | `mobile-engineer` | `mobile/` — Expo/React Native managed workflow | ✅ |
+| **Reviewer** | `reviewer` | PR correctness, style, security, standards adherence | ❌ |
+| **QA** | `qa` | Test suites, API contracts, UI states, spec compliance | ❌ |
+| **Security Eng** | `security-engineer` | Vulnerability audits, penetration testing, OWASP compliance, security standards | ❌ |
 
-All six roles are framed as **senior** practitioners — they have guardrails
+All nine roles are framed as **senior** practitioners — they have guardrails
 to flag design flaws, not just blindly implement specs.
 
 Planning roles (PM, Architect, UX Designer) produce design artifacts in
@@ -219,6 +227,9 @@ your-monorepo/
 │       ├── backend-engineer/SKILL.md # Go/chi implementation
 │       ├── frontend-engineer/SKILL.md# Next.js implementation
 │       ├── mobile-engineer/SKILL.md  # Expo/RN implementation
+│       ├── reviewer/SKILL.md         # PR correctness + standards review
+│       ├── qa/SKILL.md               # Test suites + API contract verification
+│       ├── security-engineer/SKILL.md# Vulnerability audits + pen-testing
 │       ├── go-chi/SKILL.md           # Go/chi stack standards
 │       ├── nextjs/SKILL.md           # Next.js stack standards
 │       └── expo/SKILL.md             # Expo/RN stack standards
@@ -235,8 +246,11 @@ Use DeepSeek-V4 for ~80% of work. Escalate to Claude Opus or GPT-4o when:
 - Making hard-to-reverse decisions (data model, auth strategy)
 - DeepSeek gets stuck in a hallucination loop
 - Cross-cutting refactors or security-sensitive changes
+- Running security audits (Security Engineer role)
+- Reviewing PRs for subtle correctness issues (Reviewer role)
 
-PM, UX Designer, Frontend, and Mobile roles rarely need the stronger model.
+PM, UX Designer, Frontend, Mobile, and QA roles rarely need the stronger
+model.
 
 ## The Iteration Loop
 
