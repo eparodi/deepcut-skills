@@ -251,6 +251,8 @@ When the user asks you to start work:
   git pull origin main           # fast-forward only; never merge
   git checkout -b feat/...
   ```
+  In git-worktree setups where `main` is checked out elsewhere,
+  use `git fetch origin main:main` to fast‑forward the ref instead.
 - Branch prefix: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`
 - Use kebab-case: `feat/user-profile-edit`
 - Push the branch immediately so CI runs.
