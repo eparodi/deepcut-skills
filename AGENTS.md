@@ -372,5 +372,76 @@ At the end of a feature or session:
 
 ---
 
-*Last updated: 2026-08-10*
+*Last updated: 2026-08-11*
 *These rules apply to all agent threads in this project.*
+
+---
+
+## Section 10 — Session Learnings (from retros)
+
+Rules added from retro analysis of corrections made during sessions.
+
+### 10.1 Docker Path Verification
+
+**Docker base images may override config defaults.** When a config file
+specifies a path (e.g., `hls_path /data/hls`), always verify the actual
+paths inside the running container:
+
+```bash
+docker compose exec <service> find / -name "*.m3u8" 2>/dev/null
+```
+
+Do not assume the config directive takes effect — the base image may
+have its own defaults that take precedence.
+
+### 10.2 All Code Paths for Entity Creation
+
+**When multiple code paths create the same entity, audit all paths for
+side effects.** Example: SRS callbacks (`on_publish`) and the poller both
+create streams. If a side effect (thumbnail capture, notification) is
+only added to one path, it silently fails when the other path is used.
+
+```bash
+# Find all call sites before adding a side effect
+grep -rn "CreateStream\|createStream" --include="*.go" backend/
+```
+
+### 10.3 `<img>` Error Handling
+
+**Every `<img>` with a potentially-missing `src` must have an `onError`
+fallback.** If the image URL returns 404 (file not yet generated, network
+error), the browser shows a broken image icon. Always add:
+
+```tsx
+<img
+  src={thumbnailUrl}
+  onError={(e) => {
+    const target = e.target as HTMLImageElement;
+    target.onerror = null;  // prevent infinite loop
+    target.src = "data:image/svg+xml,..."; // inline fallback
+  }}
+/>
+```
+
+### 10.4 Third-Party Library Version Checking
+
+**Always verify the exact API of the installed version, not the latest
+docs.** Breaking changes between versions (e.g., non-blocking `Start()`
+vs blocking, explicit migration requirement) can cause silent failures.
+Before using a library method:
+
+```bash
+# Check the actual source of the installed version
+find $(go env GOMODCACHE)/<package>@<version> -name "*.go" -exec grep -l "func.*Start\|func.*Migrate" {} \;
+```
+
+### 10.5 Schema Migration Idempotency
+
+**Startup migration code must handle partially-applied states from
+previous crashes.** If a migration creates tables but the process dies
+before recording the version, the next startup will try to recreate
+existing tables and fail. Always:
+
+1. Check if the target tables already exist before migrating
+2. Use `IF NOT EXISTS` in DDL where possible
+3. Catch "duplicate key" errors and verify the schema state
