@@ -203,6 +203,11 @@ going to do. This prevents scope creep and clarifies boundaries.
 - **Integration tests exercise real infrastructure** — `httptest.NewServer` +
   testcontainers Postgres for API flows, the docker compose stack for
   SRS/media flows. Mocks alone don't count as the happy-path contract.
+- **Integration tests sharing one database must not run packages in
+  parallel.** `go test` runs packages concurrently by default; when every
+  package truncates the same tables, one package wipes another's rows
+  mid-test (flaky FK violations / missing rows). Run with `-p 1` in CI,
+  or give each package its own schema/database.
 - **Test data must avoid secret-scanner patterns.** Fake keys, tokens,
   and credentials in test fixtures must not match patterns that trigger
   GitHub push protection (Stripe `sk_live_`, `rk_live_`; AWS `AKIA*`;
