@@ -156,13 +156,6 @@ going to do. This prevents scope creep and clarifies boundaries.
 ### 5.1 Build Verification
 
 - **After any code change, run the build.**
-  ...
-- **After inserting a new parameter into a function, grep all call sites.**
-  When all parameters are the same type (e.g., all `string`), the Go compiler
-  won't catch positional argument errors — only runtime tests will.
-  ```bash
-  grep -r "FunctionName(" --include="*.go" backend/
-  ```
   ```bash
   # Go backend
   cd backend && go build ./...
@@ -185,6 +178,12 @@ going to do. This prevents scope creep and clarifies boundaries.
   node --version  # verify before proceeding
   # If mismatch, use:
   PATH="$HOME/.nvm/versions/node/v$(cat .nvmrc)/bin:$PATH" npm install
+  ```
+- **After inserting a new parameter into a function, grep all call sites.**
+  When all parameters are the same type (e.g., all `string`), the Go compiler
+  won't catch positional argument errors — only runtime tests will.
+  ```bash
+  grep -r "FunctionName(" --include="*.go" backend/
   ```
 
 ### 5.2 Test Coverage
@@ -250,6 +249,10 @@ logging:
     max-size: "10m"
     max-file: "3"
 ```
+
+---
+
+## Section 6 — Git & Commit Hygiene
 
 ### 6.1 Commit & Push
 
@@ -372,7 +375,7 @@ At the end of a feature or session:
 
 ---
 
-*Last updated: 2026-08-11*
+*Last updated: 2026-08-12*
 *These rules apply to all agent threads in this project.*
 
 ---
@@ -445,3 +448,42 @@ existing tables and fail. Always:
 1. Check if the target tables already exist before migrating
 2. Use `IF NOT EXISTS` in DDL where possible
 3. Catch "duplicate key" errors and verify the schema state
+
+### 10.6 Container Config Entrypoints
+
+**Verify which config file a container's entrypoint actually loads.**
+Docker images may load a different config file than the documented one —
+the `ossrs/srs:5` image reads `conf/docker.conf`, NOT the commonly
+mounted `conf/srs.conf`, so all config tuning silently never applies.
+Check the startup log line (e.g., `SRS on aarch64, conf:conf/docker.conf`)
+before assuming your mounted config takes effect.
+
+### 10.7 External Service Payload Verification
+
+**Verify payloads and feature availability against the ACTUAL version of
+the external service.** SRS 5 sends `client_id` as a string in
+`http_hooks` callbacks (older versions sent numbers) and removed LL-HLS
+config directives entirely. Specs or docs written for a different version
+cause silent failures. Capture one real payload and pin it in a
+table-driven test.
+
+### 10.8 Subprocess Hygiene (media pipelines)
+
+**Never discard subprocess stderr, and verify media output with a decode
+pass.** For ffmpeg pipelines:
+
+- Capture stderr into a buffer and log the tail on failure
+  (`cmd.Stderr = nil` hides all failure evidence).
+- Prefer streaming containers (MPEG-TS) over indexed ones (MP4) for
+  recordings that may be killed abruptly — SIGKILL loses MP4's moov atom
+  and corrupts the audio track's extradata.
+- Verify output with `ffmpeg -v error -i out -f null -` (zero errors),
+  not just HTTP 200 / file existence.
+
+### 10.9 psql Transaction Semantics
+
+**`psql -c` with multiple statements runs them in ONE implicit
+transaction.** A failing statement rolls back every earlier statement in
+the batch (the output still prints each affected row count — it's
+misleading). Run destructive statements one at a time, or use explicit
+`BEGIN`/`COMMIT` blocks.
