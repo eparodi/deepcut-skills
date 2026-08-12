@@ -581,6 +581,10 @@ Before opening a PR for a frontend component:
 - [ ] `npx tsc --noEmit` passes
 - [ ] `npm run lint` passes (with `--max-warnings 0` — CI enforces this)
 - [ ] At minimum a render test for each component
+- [ ] **Test-first:** the render test for each distinct state (loading,
+  empty, error, populated) is written and shown failing BEFORE the
+  component renders that state; bug fixes get a failing regression test
+  first (AGENTS.md §5.2, spec-driven skill Phase 4)
 - [ ] Vitest config uses `fileURLToPath` for cross-platform path aliases (not `.pathname`)
 - [ ] All vitest functions (`describe`, `it`, `expect`, `vi`, `beforeEach`, `afterEach`) imported explicitly — do not rely on `globals: true`
 - [ ] No hardcoded external URLs in `next.config.ts` — use env vars with sensible defaults (see Config Files section)

@@ -45,6 +45,9 @@ If unsure, ask the user: "This could benefit from a spec-driven approach — wan
    When <action>
    Then <expected outcome>
    ```
+   Every acceptance criterion must be observable from the outside (HTTP
+   response, rendered UI state, file/DB effect) — if it can't be turned
+   into an integration test, it's not an acceptance criterion.
 4. List explicit non-goals — things we are deliberately NOT building:
    ```
    ## Non-Goals
@@ -169,29 +172,35 @@ the Architect — do NOT silently change the contract.
 3. Each task includes:
    - What files to create/edit
    - What the task delivers (concrete, verifiable)
+   - **Which test will be written first** (see Phase 4 test-first rules)
    - Which acceptance criteria it satisfies
    - Which role owns it
 4. Mark tasks that can run in parallel with `[P]`:
    ```markdown
    ## Task Checklist
-   
+
    1. [ ] (Backend) Create `users` migration
+      → Test: backend/cmd/server/server_test.go::TestCreateUser
       → Satisfies: data model
-   
+
    2. [ ] (Backend) Implement `POST /api/users` handler
+      → Test: backend/cmd/server/server_test.go::TestCreateUser
       → Satisfies: US1 AC1, US1 AC2
-   
+
    3. [ ] [P] (Frontend) Add UserForm component
+      → Test: frontend/src/components/UserForm.test.tsx
       → Satisfies: US1 AC3
-   
+
    4. [ ] [P] (Frontend) Add user list page
+      → Test: frontend/src/app/users/page.test.tsx
       → Satisfies: US1 AC4
-   
+
    5. [ ] [P] (Mobile) Add UserForm screen
+      → Test: mobile/__tests__/UserForm.test.tsx
       → Satisfies: US1 AC3
    ```
 
-## Phase 4 — Implementation
+## Phase 4 — Implementation (Test-First)
 
 **Owner:** Engineer roles (Backend, Frontend, Mobile).  
 **Input:** Approved spec with task checklist.
@@ -202,24 +211,52 @@ the Architect — do NOT silently change the contract.
 2. Work through tasks ONE AT A TIME, in order.
 3. For each task:
    a. Read the relevant section of the spec.
-   b. Implement the change.
-   c. Run the build. If it fails, fix it.
-   d. Run targeted tests. If they fail, fix them.
-   e. Verify against acceptance criteria.
-   f. Mark the task `[x]` in the checklist.
+   b. **Write the failing test first (Red).** Create the integration test
+      named in the task checklist BEFORE the implementation. It encodes
+      the acceptance criteria: happy path first, then each error path.
+   c. **Run the test and confirm it fails** — if it passes before the
+      implementation exists, it proves nothing about the new code.
+      A compile error counts as red; prefer the test to fail for the
+      right reason (missing route/behavior) once it compiles.
+   d. Implement the change (Green).
+   e. Run the build. If it fails, fix it.
+   f. Run targeted tests. If they fail, fix them.
+   g. Verify against acceptance criteria.
+   h. Mark the task `[x]` in the checklist.
 4. When all tasks are done, set status to `Implemented`.
+
+### Test-First Rules
+
+- **Every happy path gets an integration test before implementation.**
+  The test must exercise real infrastructure — `httptest.NewServer` +
+  testcontainers Postgres (Go), or the docker compose stack for
+  media/SRS flows — not mocks alone. Mocks may accompany it, but the
+  integration test is the contract.
+- **Every bug found during the feature gets a regression test first.**
+  Write the test that reproduces the bug (confirm it fails), then fix.
+  This applies to bugs found in review, QA, or user testing.
+- **Each error path and edge case gets its own test** (table-driven where
+  the stack skill prescribes it), written alongside the happy path.
+- **When to skip test-first:** pure refactors with no observable
+  behavior change, config-only changes, and one-line fixes without
+  observable behavior — these are test-after (still verify the suite
+  stays green).
+- **A passing test proves nothing about new code.** Always watch the new
+  test fail before writing the implementation.
 
 ### Rules During Implementation
 
 - **Backend first.** If a task requires a new API endpoint, the Backend
   Engineer must implement and stabilize it before Frontend/Mobile build
-  against it.
+  against it. (The backend's integration test is written and failing
+  before the endpoint exists — red first still applies.)
 - **Do not change the spec.** If you discover the spec is wrong during
   implementation, add a note under `## Implementation Notes` and continue
   working to the spec. Flag the issue for the PM. Do NOT silently
   deviate from the spec.
 - **Commit per task.** Each completed task gets its own commit with a
-  descriptive message.
+  descriptive message. The test and its implementation go in the same
+  commit (or two: test commit followed by implementation commit).
 - **Stop at test failures.** Do not move to the next task until the
   current one passes all tests.
 
@@ -231,8 +268,8 @@ the Architect — do NOT silently change the contract.
 |-------|-----|--------|-------|
 | 1. Requirements | PM | User stories + AC + Non-Goals | ✅ Human |
 | 2. Design | Architect + UX Designer | Architecture + API + Data Model + UI Design | ✅ Human |
-| 3. Task Breakdown | PM | Ordered checklist with role assignments | ❌ Auto |
-| 4. Implementation | Engineers | Working code | ✅ Tests |
+| 3. Task Breakdown | PM | Ordered checklist with role assignments + `→ Test:` per task | ❌ Auto |
+| 4. Implementation | Engineers | Working code + tests written first (red → green) | ✅ Tests |
 
 ---
 
@@ -279,10 +316,14 @@ For each layer:
 
 1. **Load the role's skill file** (e.g., `.agents/skills/backend-engineer/SKILL.md`)
    and adopt that role.
-2. Implement the tasks assigned to that layer.
-3. Run the layer's full test suite and lint.
-4. Once all tests pass: commit and push to the shared branch.
-5. Output the completion marker `[<LAYER>_COMPLETE]`.
+2. **Write the failing integration tests first** for the layer's tasks
+   (happy paths first, then error paths — see the Phase 4 test-first
+   rules). Confirm they fail.
+3. Implement the tasks assigned to that layer until the tests pass
+   (red → green).
+4. Run the layer's full test suite and lint.
+5. Once all tests pass: commit and push to the shared branch.
+6. Output the completion marker `[<LAYER>_COMPLETE]`.
 
 **Permission**: The usual AGENTS.md rule "never commit without explicit
 request" is overridden within this orchestrated pipeline. You may
@@ -312,34 +353,48 @@ After the PR is created, poll GitHub Checks with a timeout:
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-PR=$1
+PR="$1"
 TIMEOUT=600   # 10 minutes
 INTERVAL=15   # seconds
 ELAPSED=0
 
-while [ $ELAPSED -lt $TIMEOUT ]; do
-    # Count checks that are not SUCCESS
-    PENDING=$(gh pr checks "$PR" --json state --jq '[.[] | select(.state != "SUCCESS")] | length')
-    if [ "$PENDING" -eq 0 ]; then
-        echo "[CI_PASS]"
-        exit 0
-    fi
-    # If any check has conclusion FAILURE, exit early
-    FAILURES=$(gh pr checks "$PR" --json conclusion --jq '[.[] | select(.conclusion == "FAILURE")] | length')
-    if [ "$FAILURES" -gt 0 ]; then
+log() { echo "[poll-ci $(date +%H:%M:%S)] $*"; }
+
+while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+    JSON=$(gh pr checks "$PR" --json state 2>/dev/null || echo '[]')
+    PENDING=$(echo "$JSON" | jq '[.[] | select(.state != "SUCCESS" and .state != "SKIPPED")] | length' 2>/dev/null || echo 0)
+    PENDING=${PENDING:-0}
+    FAILURES=$(echo "$JSON" | jq '[.[] | select(.state == "FAILURE")] | length' 2>/dev/null || echo 0)
+    FAILURES=${FAILURES:-0}
+    TOTAL=$(echo "$JSON" | jq 'length' 2>/dev/null || echo 0)
+    TOTAL=${TOTAL:-0}
+
+    if [ "$TOTAL" -eq 0 ]; then
+        log "no checks found yet (elapsed ${ELAPSED}s)"
+    elif [ "$FAILURES" -gt 0 ]; then
+        log "${FAILURES} of ${TOTAL} checks FAILED"
         echo "[CI_FAIL]"
         exit 1
+    elif [ "$PENDING" -eq 0 ]; then
+        log "all ${TOTAL} checks passed"
+        echo "[CI_PASS]"
+        exit 0
+    else
+        log "${PENDING} of ${TOTAL} checks pending (elapsed ${ELAPSED}s)"
     fi
-    sleep $INTERVAL
+
+    sleep "$INTERVAL"
     ELAPSED=$((ELAPSED + INTERVAL))
 done
 
+log "timed out after ${TIMEOUT}s"
 echo "[CI_TIMEOUT]"
 exit 2
 ```
 
-Store this script as `/tmp/poll-ci.sh`, make it executable, and invoke
-it with the PR number.
+Store this script, make it executable (chmod +x), and invoke it with
+the PR number. The log function prints timestamped lines so you can
+see progress during the poll.
 
 - If `[CI_PASS]` → go to Phase 4.
 - If `[CI_FAIL]` → examine the failed checks, fix the code (switch back
@@ -359,18 +414,43 @@ it with the PR number.
 4. If the review is clean or only has minor/optional notes:
    - Output `[REVIEW_PASS]` and proceed.
 
-### Phase 5 — QA
+### Phase 5 — QA + Security (parallel)
+
+QA and Security Engineer run simultaneously. Both must pass before
+proceeding.
+
+#### 5a — QA
 
 1. Load `.agents/skills/qa/SKILL.md`.
 2. Execute the QA plan (run tests, verify contracts, inspect UI).
 3. Post the QA report as a PR comment.
 4. If `[QA_FAIL]` → switch to the responsible engineer, fix issues,
    push, then loop back to Phase 3.
-5. If `[QA_PASS]` → proceed.
+5. If `[QA_PASS]` → proceed to gate.
+
+#### 5b — Security Engineer
+
+1. Load `.agents/skills/security-engineer/SKILL.md`.
+2. Execute the security audit (static analysis, auth review, input
+   validation, API security, dependency audit).
+3. If the app is running locally, perform runtime reconnaissance and
+   penetration testing.
+4. Post the security report as a PR comment.
+5. If `[SECURITY_FAIL]` → switch to the responsible engineer, fix
+   every critical and high issue, push, then loop back to Phase 3.
+6. If `[SECURITY_PASS]` → proceed to gate.
+
+#### Parallel Gate
+
+- Both QA and Security must output `[QA_PASS]` and `[SECURITY_PASS]`.
+- If either fails, the orchestrator fixes issues and loops back.
+- If only medium/low items remain, the Security Engineer may output
+  `[SECURITY_PASS]` with a note to track those as tech-debt.
 
 ### Phase 6 — Ready for User
 
-When CI ✅, Reviewer ✅, QA ✅, output the following final message:
+When CI ✅, Reviewer ✅, QA ✅, Security ✅, output the following final
+message:
 
 ```
 🚦 All gates passed.
@@ -382,6 +462,7 @@ Branch: feat/<slug>
 - CI:       ✅
 - Reviewer: ✅
 - QA:       ✅
+- Security: ✅
 
 Ready for your final review. Merge when satisfied.
 ```

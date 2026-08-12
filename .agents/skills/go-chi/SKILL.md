@@ -352,6 +352,11 @@ if errors.As(err, &appErr) {
 
 ## Testing
 
+> **Test-first:** write the integration test before the handler/endpoint
+> (happy path first), confirm it fails, then implement until green. Every
+> bug fix gets a regression test first. (See AGENTS.md §5.2 and the
+> spec-driven skill Phase 4.)
+
 ### DO — Table-driven handler tests
 
 ```go

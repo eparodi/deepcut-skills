@@ -194,6 +194,15 @@ going to do. This prevents scope creep and clarifies boundaries.
   - Edge case (empty input, max length, boundary values)
 - New UI components must have at minimum a render test and tests for
   each distinct state (loading, empty, error, populated).
+- **Test-first for observable behavior (TDD).** For new endpoints, user
+  flows, and media pipelines: write the integration test BEFORE the
+  implementation, run it and confirm it fails (red), then implement
+  until it passes (green). Every bug found during review/QA/user testing
+  gets a regression test that reproduces it before the fix. Pure
+  refactors and config-only changes are test-after.
+- **Integration tests exercise real infrastructure** — `httptest.NewServer` +
+  testcontainers Postgres for API flows, the docker compose stack for
+  SRS/media flows. Mocks alone don't count as the happy-path contract.
 - **Test data must avoid secret-scanner patterns.** Fake keys, tokens,
   and credentials in test fixtures must not match patterns that trigger
   GitHub push protection (Stripe `sk_live_`, `rk_live_`; AWS `AKIA*`;
