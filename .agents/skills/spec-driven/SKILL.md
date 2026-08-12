@@ -243,6 +243,9 @@ the Architect — do NOT silently change the contract.
   stays green).
 - **A passing test proves nothing about new code.** Always watch the new
   test fail before writing the implementation.
+- **Red commits must not be the last thing pushed.** A commit containing
+  only the failing test intentionally fails CI. Push it together with
+  (or after) its green counterpart so the branch HEAD is always green.
 
 ### Rules During Implementation
 
@@ -254,6 +257,11 @@ the Architect — do NOT silently change the contract.
   implementation, add a note under `## Implementation Notes` and continue
   working to the spec. Flag the issue for the PM. Do NOT silently
   deviate from the spec.
+- **Stale spec conditions.** Spec instructions with conditions ("remove
+  field X until the backend implements it") go stale when another feature
+  implements the missing piece. When the condition flips, keep the
+  current contract and log an Implementation Note instead of blindly
+  following the stale instruction.
 - **Commit per task.** Each completed task gets its own commit with a
   descriptive message. The test and its implementation go in the same
   commit (or two: test commit followed by implementation commit).
