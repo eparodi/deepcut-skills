@@ -59,12 +59,13 @@ docker compose build --no-cache <service>
 
 ### 2c. Config File Verification
 
-For infrastructure config (SRS, nginx, etc.):
-- Verify the config file name matches what the Docker image actually loads
-  (e.g., `ossrs/srs:5` uses `docker.conf`, not `srs.conf`)
+For infrastructure config (media servers, nginx, etc.):
+- Verify the config file name matches what the Docker image's entrypoint
+  actually loads — check the startup log line; images commonly load a
+  different file than the documented one
 - Check actual file paths inside the container match config values:
   ```bash
-  docker compose exec <svc> find / -name "*.m3u8" 2>/dev/null
+  docker compose exec <svc> find / -name "<expected-artifact>" 2>/dev/null
   ```
 
 ### 3. API contract verification (backend ↔ frontend)

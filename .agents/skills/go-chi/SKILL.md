@@ -1,104 +1,91 @@
 ---
 name: go-chi
-description: Go/chi backend development standards — project layout, layering, error handling, testing, database patterns, and platform-specific AI traps. Load when writing Go code in the backend/ directory.
+description: Go/chi backend development standards — layering, error handling, concurrency, state management, testing, database patterns, and common AI traps. Load when writing Go code in the backend/ directory.
 ---
 
 # Go/chi Backend Standards
 
 You are writing Go code using net/http stdlib + chi router v5. Follow
-these conventions exactly. When DeepSeek suggests something that
-contradicts this document, trust this document.
+these conventions exactly. When your instinct (or a plausible-looking
+API) contradicts this document, trust this document. These rules distill
+the Uber Go Style Guide, Go Code Review Comments, and hard-won project
+retros.
 
-## Project Layout (Monorepo)
+## Project Layout
 
-```
-backend/
-├── cmd/
-│   └── server/
-│       └── main.go            # Entry point, wires everything
-├── internal/
-│   ├── handler/               # HTTP handlers (one file per resource)
-│   │   ├── users.go
-│   │   ├── products.go
-│   │   └── routes.go          # chi route registration
-│   ├── service/               # Business logic
-│   │   ├── users.go
-│   │   └── products.go
-│   ├── store/                 # Data access (database, external APIs)
-│   │   ├── postgres/
-│   │   │   ├── queries/       # sqlc query files (.sql)
-│   │   │   ├── db.go          # pgxpool setup
-│   │   │   ├── models.go      # sqlc-generated (DO NOT EDIT)
-│   │   │   └── querier.go     # sqlc-generated interface
-│   │   │   ├── users.go       # Repository methods
-│   │   │   └── products.go
-│   │   └── memstore/          # In-memory store for tests
-│   ├── middleware/             # Custom middleware
-│   │   ├── auth.go
-│   │   ├── logging.go
-│   │   └── requestid.go
-│   ├── model/                 # Domain types (shared across layers)
-│   │   ├── user.go
-│   │   └── product.go
-│   ├── errs/                  # Custom error types
-│   │   └── errors.go
-│   └── config/                # Configuration
-│       └── config.go
-├── db/
-│   └── migrations/            # golang-migrate SQL files
-│       ├── 000001_create_users.up.sql
-│       └── 000001_create_users.down.sql
-├── go.mod
-├── go.sum
-└── Makefile
+**Rule: discover the layout before creating files.** Never assume a
+layout — different Go projects use different structures, and creating
+files in the wrong place is one of the most common AI failures.
+
+```bash
+# Discover where handlers/services/repos actually live:
+find backend -name "*.go" -not -name "*_test.go" | head -30
 ```
 
-### Layer Rules
+Two common layouts you will encounter:
 
-| Layer | Directory | Can import | Must NOT import |
-|-------|-----------|-----------|-----------------|
-| Handler | `internal/handler/` | `service`, `model`, `errs`, `middleware` | `store` directly |
-| Service | `internal/service/` | `store`, `model`, `errs` | `handler`, `net/http` |
-| Store | `internal/store/` | `model`, `errs` | `handler`, `service`, `net/http` |
-| Model | `internal/model/` | nothing | `handler`, `service`, `store` |
+```
+# A. Flat layered                    # B. Hexagonal modules
+backend/                             backend/
+├── cmd/server/main.go               ├── cmd/server/main.go
+├── internal/                        ├── internal/
+│   ├── handler/    # HTTP           │   ├── modules/<feature>/
+│   ├── service/    # business       │   │   ├── domain/       # entities + ports
+│   ├── store/      # data access    │   │   ├── application/  # services
+│   ├── model/      # domain types   │   │   └── adapter/
+│   ├── errs/       # error types    │   │       ├── http/     # handlers
+│   └── config/                      │   │       └── postgres/ # repos
+└── db/migrations/                   │   └── shared/{errs,render}/
+                                     └── db/migrations/
+```
 
-**Rule:** Handlers parse HTTP, services enforce business rules, stores
-talk to databases. A handler never opens a database connection. A service
-never parses an HTTP request body.
+New files go where equivalent files already live. If the repo uses
+hexagonal modules, a new feature gets a new module directory — do NOT
+introduce a parallel `handlers/` tree (or vice versa).
 
-### Service Logging
+### Layer Rules (apply to any layout)
 
-**Rule:** Services MUST use injected `*slog.Logger`, never the global `slog`
-package functions. This ensures log output respects the configured handler
-and log level, and allows tests to control verbosity by passing `nil`.
+| Layer | Responsibility | Must NOT |
+|-------|----------------|----------|
+| Handler (HTTP adapter) | Parse/validate requests, render responses | Open DB connections, contain business rules |
+| Service (application) | Business rules, orchestration | Import `net/http`, parse request bodies |
+| Repository (store/adapter) | Database and external-API access | Import handlers or services |
+| Domain (model) | Entities, typed constants, ports (interfaces) | Import any other layer |
+
+**Rule:** validation of HTTP input (required fields, enum membership,
+lengths) lives in the handler. Business rules (authorization, state
+transitions) live in the service.
+
+## Logging
+
+**Rule:** Services MUST use an injected `*slog.Logger`, never the global
+`slog` package functions — including in files that live NEXT TO code
+that already does it right. Global calls bypass the configured handler
+and make test output uncontrollable.
 
 ```go
-// ✅ Right: injected logger
+// ✅ Right: injected logger with nil-safe helpers (tests pass nil)
 type MyService struct {
     logger *slog.Logger
 }
 
-func NewMyService(..., logger *slog.Logger) *MyService {
-    return &MyService{..., logger: logger}
-}
-
-// Nil-safe helper for optional logging in tests
 func (s *MyService) infoLog(msg string, args ...any) {
     if s.logger != nil {
         s.logger.Info(msg, args...)
     }
 }
 
-// ❌ Wrong: global slog bypasses configured handler/level
+// ❌ Wrong: global slog inside a type that HAS a logger field
 func (s *MyService) doWork() {
-    slog.Info("work done")
+    slog.Info("work done") // bypasses configured handler/level
 }
 ```
 
-### Log Level Configuration
+**Before finishing any service change:** `grep -n "slog\." <file>` and
+replace stray global calls with the injected logger.
 
-**Rule:** `main.go` MUST support a `LOG_LEVEL` environment variable.
-Supported values: `debug`, `info` (default), `warn`, `error`.
+`main.go` MUST support `LOG_LEVEL` (`debug`, `info` default, `warn`,
+`error`):
 
 ```go
 func newLogger() *slog.Logger {
@@ -115,19 +102,80 @@ func newLogger() *slog.Logger {
 }
 ```
 
+## State & Mutable Globals
+
+**Package-level mutable state is banned** (Uber Go: Avoid Mutable
+Globals). `var cache sync.Map` or `var seen = map[string]bool{}` at
+package level is shared across every instance of your service — tests
+can't isolate it, a second instance corrupts the first, and any future
+writer can poison the type.
+
+```go
+// ❌ Wrong — package-level registry
+var activeJobs sync.Map // map[string]context.CancelFunc
+
+// ✅ Right — a field on the owning service
+type JobService struct {
+    // activeJobs tracks running jobs (jobID → context.CancelFunc).
+    activeJobs sync.Map
+}
+```
+
+**Type assertions from `any` use comma-ok — always.** A bare
+`x.(string)` panics on mismatch; the map above is exactly where a future
+refactor changes the stored type.
+
+```go
+// ❌ panics if the entry isn't a string
+path := stored.(string)
+
+// ✅ comma-ok, degrade gracefully
+path, ok := stored.(string)
+if !ok {
+    s.warnLog("unexpected entry type", "key", key)
+    return ""
+}
+```
+
+`sync.Map` tip: use `LoadAndDelete` for pop semantics instead of
+`Load` + `Delete` (atomic, less code).
+
+## Enums & Magic Strings
+
+Status/state strings written to the database or compared in code MUST be
+typed constants in the domain package. Raw literals scattered across
+call sites ("live", "processing", "failed") drift, typo silently, and
+cannot be found by grep-for-type.
+
+```go
+// domain package
+type JobStatus string
+
+const (
+    JobStatusPending JobStatus = "pending"
+    JobStatusRunning JobStatus = "running"
+    JobStatusFailed  JobStatus = "failed"
+)
+
+// call site
+repo.UpdateStatus(ctx, id, string(domain.JobStatusFailed))
+```
+
+Inline literals inside SQL text (`WHERE status = 'live'`) are fine —
+they are part of the query, not Go-side magic values. If two modules
+must stay dependency-free, each defines its own constants with matching
+values and a comment linking them.
+
+Related magic-value rules:
+- `"GET"` / `"POST"` → `http.MethodGet` / `http.MethodPost`
+- Repeated buffer sizes / close codes → named constants
+- `fmt.Errorf("static message")` with no verbs → `errors.New(...)`
+
 ## chi Router Patterns
 
 ### DO — Standard route registration
 
 ```go
-// internal/handler/routes.go
-package handler
-
-import (
-    "github.com/go-chi/chi/v5"
-    "github.com/go-chi/chi/v5/middleware"
-)
-
 func RegisterRoutes(r chi.Router, h *Handlers) {
     r.Use(middleware.RequestID)
     r.Use(middleware.RealIP)
@@ -155,36 +203,16 @@ func RegisterRoutes(r chi.Router, h *Handlers) {
 | ❌ Hallucination | ✅ Correct |
 |---|---|
 | `chi.Param(r, "id")` | `chi.URLParam(r, "userID")` |
+| `chi.Query(r, "page")` | `r.URL.Query().Get("page")` |
 | `chi.Render(w, r, data)` | Write your own `render.JSON(w, status, data)` |
-| `chi.NewRouter()` returning `*chi.Mux` | `chi.NewRouter()` returns `chi.Router` |
-| `r.Context().Value(chi.RouteCtx)` | Use `chi.RouteContext(r.Context())` |
+| `chi.Bind(r, v)` | `json.NewDecoder(r.Body).Decode(v)` |
+| `r.Context().Value(chi.RouteCtx)` | `chi.RouteContext(r.Context())` |
 | `middleware.DefaultLogger` | `middleware.Logger` (no "Default") |
-
-### DO — Context middleware for entity loading
-
-```go
-func (h *Handlers) UserCtx(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        userID := chi.URLParam(r, "userID")
-        if userID == "" {
-            render.Error(w, r, errs.BadRequest("missing user ID"))
-            return
-        }
-        user, err := h.service.GetUser(r.Context(), userID)
-        if err != nil {
-            render.Error(w, r, fmt.Errorf("get user: %w", err))
-            return
-        }
-        ctx := context.WithValue(r.Context(), ctxKeyUser, user)
-        next.ServeHTTP(w, r.WithContext(ctx))
-    })
-}
-```
+| `middleware.NewRecoverer()` | `middleware.Recoverer` |
 
 ### DO — Middleware ordering matters
 
 ```go
-// Correct order (first defined = outermost, runs first)
 r.Use(middleware.RequestID)     // 1. Attach request ID
 r.Use(middleware.RealIP)        // 2. Parse X-Forwarded-For
 r.Use(LoggingMiddleware)        // 3. Log with request ID
@@ -202,8 +230,9 @@ expires won't be caught.
 
 ```go
 func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
-    // 1. Parse request
+    // 1. Parse request (with size limit)
     var input model.CreateUserInput
+    r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
     if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
         render.Error(w, r, errs.BadRequest("invalid JSON: %v", err))
         return
@@ -228,74 +257,120 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-### DO NOT — Common handler mistakes
-
-| ❌ Wrong | ✅ Right |
-|---|---|
-| Forget `defer r.Body.Close()` | Always `defer r.Body.Close()` after reading |
-| Set headers after `WriteHeader` | `Header().Set()` BEFORE `WriteHeader()` |
-| Write response before checking error | Check error FIRST, then write response |
-| `w.Write([]byte(...))` for JSON | Use `json.NewEncoder(w).Encode(v)` |
-| Ignore `r.Body` size | Use `http.MaxBytesReader` to limit body size |
-
 ### DO — All four server timeouts
 
 ```go
 srv := &http.Server{
-    Addr:         ":" + port,
-    Handler:      r,
-    ReadTimeout:  5 * time.Second,   // time to read request
-    WriteTimeout: 10 * time.Second,  // time to write response
-    IdleTimeout:  120 * time.Second, // keep-alive timeout
-    ReadHeaderTimeout: 2 * time.Second, // time to read headers only
+    Addr:              ":" + port,
+    Handler:           r,
+    ReadTimeout:       5 * time.Second,
+    WriteTimeout:      10 * time.Second,
+    IdleTimeout:       120 * time.Second,
+    ReadHeaderTimeout: 2 * time.Second,
 }
 ```
 
-### DO — Graceful shutdown
+### DO — Exit once, in main (`run()` pattern)
+
+`os.Exit` and `log.Fatal` skip deferred cleanup (`pool.Close()`,
+`cancel()`). Call them **only in `main`, at most once**. Everything else
+returns errors (Uber Go: Exit in Main / Exit Once).
 
 ```go
 func main() {
-    // ... setup ...
+    logger := newLogger()
+    if err := run(logger); err != nil {
+        logger.Error("server exited with error", "err", err)
+        os.Exit(1)
+    }
+}
 
-    srv := &http.Server{Addr: ":8080", Handler: r}
+func run(logger *slog.Logger) error {
+    pool, err := pgxpool.New(ctx, dbURL)
+    if err != nil {
+        return fmt.Errorf("connect db: %w", err)
+    }
+    defer pool.Close() // actually runs now
 
+    // Serve-goroutine errors flow into the shutdown select — no Fatal
+    // inside goroutines.
+    serveErr := make(chan error, 1)
     go func() {
         if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-            log.Fatalf("listen: %v", err)
+            serveErr <- err
         }
     }()
 
     quit := make(chan os.Signal, 1)
     signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-    <-quit
 
-    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-    defer cancel()
-    if err := srv.Shutdown(ctx); err != nil {
-        log.Fatalf("shutdown: %v", err)
+    select {
+    case err := <-serveErr:
+        return fmt.Errorf("listen: %w", err)
+    case <-quit:
     }
+
+    shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        return fmt.Errorf("shutdown: %w", err)
+    }
+    return nil
 }
 ```
+
+**Constructors return errors — they do not panic and do not Fatal.**
+`NewAuthService(...) (*AuthService, error)`, not a `panic()` on bad
+config. The only acceptable panic is package initialization of
+hardcoded values (`template.Must` on a literal).
+
+## Goroutine Lifetime
+
+**No fire-and-forget goroutines** (Uber Go). Every goroutine you start
+must have (a) a way to be told to stop, and (b) a way for the owner to
+wait for it to finish. Background pollers/workers launched from `main`
+must be stopped during graceful shutdown:
+
+```go
+pollerCtx, pollerCancel := context.WithCancel(context.Background())
+defer pollerCancel()
+pollerDone := make(chan struct{})
+go func() {
+    defer close(pollerDone)
+    svc.StartPoller(pollerCtx)
+}()
+
+// ... on shutdown:
+pollerCancel()
+<-pollerDone
+```
+
+For goroutines that register themselves in a tracking map keyed by ID
+(recording jobs, capture loops): `defer cancel()` inside the goroutine
+too, so an early-exit path (mkdir failure, bad input) can't leak the
+context.
+
+**Every path that ends an entity must stop its side-effect goroutines.**
+When start-of-X spawns goroutines (recording, monitoring), extract ONE
+`stopXSideEffects()` teardown helper and call it from every end path —
+the callback path, the poller path, the force-end path, the interrupt
+path. Divergent teardown between paths is how goroutine/disk leaks ship.
 
 ## Error Handling
 
 ### DO — Error types
 
 ```go
-// internal/errs/errors.go
-package errs
-
-import "fmt"
-
+// errs package
 type Kind string
 
 const (
-    KindNotFound       Kind = "not_found"
-    KindBadRequest     Kind = "bad_request"
-    KindUnauthorized   Kind = "unauthorized"
-    KindForbidden      Kind = "forbidden"
-    KindConflict       Kind = "conflict"
-    KindInternal       Kind = "internal"
+    KindNotFound     Kind = "not_found"
+    KindBadRequest   Kind = "bad_request"
+    KindUnauthorized Kind = "unauthorized"
+    KindForbidden    Kind = "forbidden"
+    KindConflict     Kind = "conflict"
+    KindInternal     Kind = "internal"
 )
 
 type AppError struct {
@@ -307,81 +382,88 @@ type AppError struct {
 func (e *AppError) Error() string { return e.Message }
 func (e *AppError) Unwrap() error { return e.Err }
 
-// Constructor helpers
 func NotFound(msg string, args ...any) *AppError {
     return &AppError{Kind: KindNotFound, Message: fmt.Sprintf(msg, args...)}
 }
-func BadRequest(msg string, args ...any) *AppError {
-    return &AppError{Kind: KindBadRequest, Message: fmt.Sprintf(msg, args...)}
-}
-// ... etc for each kind
+// ... one constructor per kind
 ```
 
-### DO NOT — Sentinel errors as strings
+### DO — Match error kinds before fallback behavior
+
+**Never treat "any error" as "not found."** A DB outage is not a missing
+row; falling through to a create/insert on any error causes duplicate
+writes or masks the real failure.
 
 ```go
-// ❌ Bad: string comparison
-var ErrNotFound = errors.New("not found")
-if errors.Is(err, ErrNotFound) { ... } // fragile
+// ❌ Wrong — DB down ⇒ tries to create a duplicate user
+user, err := svc.GetByGoogleID(ctx, id)
+if err != nil {
+    user, err = svc.CreateUser(ctx, ...)
+}
 
-// ✅ Good: type assertion
-var appErr *errs.AppError
-if errors.As(err, &appErr) {
-    switch appErr.Kind {
-    case errs.KindNotFound:
-        w.WriteHeader(http.StatusNotFound)
+// ✅ Right — only create when the error is specifically NotFound
+user, err := svc.GetByGoogleID(ctx, id)
+if err != nil {
+    var appErr *errs.AppError
+    if !errors.As(err, &appErr) || appErr.Kind != errs.KindNotFound {
+        render.Error(w, r, fmt.Errorf("get user: %w", err))
+        return
     }
+    user, err = svc.CreateUser(ctx, ...)
+    // handle create error
 }
 ```
 
-### DO NOT — Error handling anti-patterns
+### DO — Handle each error once
+
+Log an error OR return it — not both. Callers up the stack will handle
+returned errors; double-handling floods logs (Uber Go: Handle Errors
+Once).
+
+Two legitimate patterns:
+- **Return wrapped** (default): `return fmt.Errorf("get user %q: %w", id, err)`
+- **Log and degrade** (error is non-critical): `s.errorLog("analytics update failed", "err", err)` then continue
+
+One deliberate exception: a handler MAY log before rendering when the
+render layer deliberately hides internals from the client (generic
+`{"error":"internal server error"}` bodies). Then the log is the only
+evidence — that is one handling (client response) plus observability,
+not double-handling. Don't also log again further up.
+
+### DO NOT — Error anti-patterns
 
 | ❌ Wrong | ✅ Right |
 |---|---|
-| `if err != nil { log.Fatal(err) }` in handlers | Return error to caller, let middleware log |
-| `return nil, err` (bare) | `return nil, fmt.Errorf("context: %w", err)` |
-| Panic in handler | Return error; Recoverer middleware catches panics |
-| `errors.New("user not found")` | `errs.NotFound("user %s not found", id)` |
-| `_ = someFunc()` (discard error) | At minimum `slog.Error("op failed", "err", err)`. If the error is truly non-critical, log it. |
-| Return `errs.NotFound` for "no active stream to end" | Return `errs.Conflict` — the user exists, but their state (not-live) prevents the operation. 409 is semantically correct for state conflicts. |
-| Return `errs.NotFound` when the resource exists but in wrong state | Use `errs.Conflict("no active stream to end")`. NotFound should be reserved for truly missing resources (wrong user ID, deleted entity). |
+| `if err == pgx.ErrNoRows` | `if errors.Is(err, pgx.ErrNoRows)` — wrapped errors break `==` |
+| `return nil, err` (bare, crossing layers) | `return nil, fmt.Errorf("context: %w", err)` |
+| `fmt.Errorf("failed to create store: %w", err)` | `fmt.Errorf("new store: %w", err)` — "failed to" piles up as errors percolate |
+| Panic in handler/service | Return error; Recoverer catches genuine panics |
+| `_ = someFunc()` (discard error) | Log at WARN/ERROR minimum. Includes `rand.Read`, `json.Marshal`, `os.MkdirAll` |
+| 404 for "resource exists but wrong state" | `errs.Conflict(...)` → 409. NotFound is for truly missing resources |
+| Constructor panics on bad input | Return `(T, error)` |
 
-**Bare error returns are banned.** Every error crossing a layer boundary must be wrapped with context. This is not optional — unwrapped errors make debugging production incidents near-impossible.
-
-**Silently discarded errors (`_ =`) are banned.** If a function returns an error you genuinely don't care about (analytics update during stream-end cleanup), log it at WARN or ERROR level. Silent data loss is worse than a noisy log.
+**Bare error returns are banned.** Every error crossing a layer boundary
+gets wrapped with context. **Silently discarded errors (`_ =`) are
+banned.** If it's truly non-critical, log it.
 
 ## Testing
 
 > **Test-first:** write the integration test before the handler/endpoint
-> (happy path first), confirm it fails, then implement until green. Every
-> bug fix gets a regression test first. (See AGENTS.md §5.2 and the
-> spec-driven skill Phase 4.)
+> (happy path first), confirm it fails, then implement until green.
+> Every bug fix gets a regression test first.
 
 ### DO — Table-driven handler tests
 
 ```go
 func TestCreateUser(t *testing.T) {
     tests := []struct {
-        name    string
-        body    string
+        name     string
+        body     string
         wantCode int
-        wantErr  bool
     }{
-        {
-            name:     "valid user",
-            body:     `{"name":"Alice","email":"alice@example.com"}`,
-            wantCode: http.StatusCreated,
-        },
-        {
-            name:     "missing name",
-            body:     `{"email":"alice@example.com"}`,
-            wantCode: http.StatusBadRequest,
-        },
-        {
-            name:     "empty body",
-            body:     ``,
-            wantCode: http.StatusBadRequest,
-        },
+        {name: "valid user", body: `{"name":"Alice","email":"a@example.com"}`, wantCode: http.StatusCreated},
+        {name: "missing name", body: `{"email":"a@example.com"}`, wantCode: http.StatusBadRequest},
+        {name: "empty body", body: ``, wantCode: http.StatusBadRequest},
     }
 
     for _, tt := range tests {
@@ -389,8 +471,7 @@ func TestCreateUser(t *testing.T) {
             svc := &mockUserService{}
             h := NewHandlers(svc)
 
-            req := httptest.NewRequest("POST", "/api/users",
-                strings.NewReader(tt.body))
+            req := httptest.NewRequest("POST", "/api/users", strings.NewReader(tt.body))
             req.Header.Set("Content-Type", "application/json")
             rec := httptest.NewRecorder()
 
@@ -404,13 +485,16 @@ func TestCreateUser(t *testing.T) {
 }
 ```
 
+Keep table tests simple: if subtests need conditional mock wiring or
+branching assertions, split into separate `Test...` functions instead
+(Uber Go: Avoid Unnecessary Complexity in Table Tests).
+
 ### DO — Integration tests with httptest.NewServer
 
 ```go
 func TestIntegration(t *testing.T) {
-    // Setup real router with real dependencies
     r := chi.NewRouter()
-    h := setupHandlers(t)  // real DB connection, etc.
+    h := setupHandlers(t)  // real DB (testcontainers), real router
     handler.RegisterRoutes(r, h)
 
     ts := httptest.NewServer(r)
@@ -433,9 +517,10 @@ func TestIntegration(t *testing.T) {
 | ❌ Wrong | ✅ Right |
 |---|---|
 | Test only happy path | Table-driven: happy + each error + edge case |
-| Mock database by hand | Use generated mocks (mockgen) or interface stubs |
 | `httptest.NewServer` for unit tests | `httptest.NewRecorder` for unit tests |
 | Skip body close in test requests | Still `defer resp.Body.Close()` |
+| `panic("setup failed")` in tests | `t.Fatal(...)` so the test is marked failed |
+| Changing a constructor signature without grepping tests | `grep -rn "NewXxx(" --include="*_test.go"` first |
 
 ## JSON Encoding/Decoding
 
@@ -445,80 +530,56 @@ func TestIntegration(t *testing.T) {
 type User struct {
     ID        string    `json:"id"`
     Name      string    `json:"name"`
-    Email     string    `json:"email"`
     Role      string    `json:"role,omitempty"`
     CreatedAt time.Time `json:"createdAt"`
     Password  string    `json:"-"`              // never serialized
-    Internal  string    `json:"-,"`             // literal "-" key
-    Count     int       `json:"count,string"`   // "42" instead of 42
 }
 ```
 
-### DO — Disallow unknown fields
+Every marshaled struct field gets an explicit tag — the serialized form
+is a contract; tags protect it from field renames (Uber Go).
+
+### DO — Match response shapes to the frontend contract
+
+**Rule:** Before writing a handler response struct, read the frontend
+TypeScript type (typically `frontend/src/types/index.ts`). The Go `json`
+tags must match the TypeScript field names **exactly** — same camelCase,
+same wrapper objects, no extra fields, no missing fields.
 
 ```go
-decoder := json.NewDecoder(r.Body)
-decoder.DisallowUnknownFields()
-var input model.CreateUserInput
-if err := decoder.Decode(&input); err != nil {
-    // handle error
-}
+// Frontend type: { items: Item[]; total: number }
+render.JSON(w, http.StatusOK, map[string]any{
+    "items": items,
+    "total": len(items),
+})
+
+// ❌ Wrong: bare array when frontend expects a wrapper
+// ❌ Wrong: {"status":"ok"} when frontend expects echoed fields
 ```
+
+**Pre-implementation checklist for every handler response:**
+1. `grep -A 20 "interface <Name>" frontend/src/types/index.ts`
+2. Copy every field name into your Go struct tags (camelCase, exactly)
+3. Verify wrapper objects match (bare `T` vs `{items: T[], total: N}`)
+4. Optional fields (`?:`) use pointer + `omitempty`
+5. Return `[]` not `null` for empty arrays: `if items == nil { items = []Item{} }`
 
 ### DO NOT — JSON mistakes
 
 | ❌ Wrong | ✅ Right |
 |---|---|
 | `json.Marshal` in handler | `json.NewEncoder(w).Encode(v)` (streams) |
-| Ignore JSON syntax errors | Switch on `*json.SyntaxError`, `*json.UnmarshalTypeError` |
-| `interface{}` for partial JSON | Define a typed struct even for partial data |
-
-### DO — Match response shapes to frontend contract
-
-**Rule:** Before writing a handler response struct, read the frontend TypeScript type from `frontend/src/types/index.ts`. The Go `json` tags must match the TypeScript field names **exactly**. The JSON response shape (wrapper objects, arrays vs. single objects) must match what the frontend expects.
-
-```go
-// ✅ Frontend type: { streams: LiveStream[]; total: number }
-// Go handler:
-render.JSON(w, http.StatusOK, map[string]any{
-    "streams": streams,
-    "total":   len(streams),
-})
-
-// ❌ Wrong: bare array
-render.JSON(w, http.StatusOK, streams) // Frontend expects LiveStreamsResponse, not LiveStream[]
-
-// ❌ Wrong: generic success response when frontend expects echoed fields
-render.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
-// Frontend expects: { streamTitle: string; streamCategory: string | null }
-```
-
-| ❌ Wrong | ✅ Right |
-|---|---|
-| Return bare array when frontend expects `{streams, total}` wrapper | Wrap in the response struct the frontend type defines |
-| Return `{"status":"ok"}` when frontend expects echoed fields | Return the fields the frontend expects (e.g., `{streamTitle, streamCategory}`) |
-| Include extra fields not in the frontend type (e.g., `createdAt` when not in `User`) | Only include fields present in the frontend TypeScript interface |
-| Omit fields that the frontend type declares (e.g., missing `streamCategory`) | Include all fields from the frontend type, even if `null` |
-| Guess field names from database column names | Read `frontend/src/types/index.ts` and use the exact camelCase key names |
-
-**Pre-implementation checklist for every handler response:**
-1. `grep` the interface name in `frontend/src/types/index.ts`
-2. Copy every field name into your Go struct tags (camelCase, exactly)
-3. Verify wrapper objects match (is it `T` or `{items: T[]; total: N}`?)
-4. Verify optional fields use `*string` + `omitempty` when the frontend type has `?:`
+| `interface{}` for partial JSON | Typed struct even for partial data; use `any` not `interface{}` in new code |
+| `DisallowUnknownFields()` on third-party webhooks | Only on YOUR API's inputs (see Webhooks below) |
+| `time.Format("2006-01-02T15:04:05Z")` | `t.UTC().Format(time.RFC3339)` — the literal `Z` lies about non-UTC times |
 
 ## Context Propagation
 
-### DO — Typed, unexported context keys
-
 ```go
-// internal/handler/context.go
-package handler
-
 type ctxKey int
 
 const (
-    ctxKeyUser ctxKey = iota
+    ctxKeyUser ctxKey = iota + 1 // start at 1: zero value is invalid
     ctxKeyRequestID
 )
 
@@ -526,85 +587,50 @@ func UserFromCtx(ctx context.Context) (*model.User, bool) {
     u, ok := ctx.Value(ctxKeyUser).(*model.User)
     return u, ok
 }
-
-func WithUser(ctx context.Context, u *model.User) context.Context {
-    return context.WithValue(ctx, ctxKeyUser, u)
-}
 ```
-
-### DO NOT — Context mistakes
 
 | ❌ Wrong | ✅ Right |
 |---|---|
 | String context keys | Unexported typed constants |
-| Pass request ctx to goroutine | `ctx, cancel := context.WithTimeout(context.Background(), ...)` |
-| Forget `defer cancel()` | Always `defer cancel()` after `WithCancel`/`WithTimeout` |
+| Pass request ctx to a background goroutine | Derive from `context.Background()` — request ctx dies with the request |
+| Forget `defer cancel()` | Always after `WithCancel`/`WithTimeout` |
+| `Stop(context.Background())` on shutdown paths | Give shutdown calls a timeout: `context.WithTimeout(..., 10*time.Second)` |
 
-## Database (sqlc + pgx)
+## Database (pgx / sqlc)
 
-### DO — sqlc configuration
-
-```yaml
-# db/sqlc.yaml
-version: "2"
-sql:
-  - engine: "postgresql"
-    queries: "internal/store/postgres/queries/"
-    schema: "db/migrations/"
-    gen:
-      go:
-        package: "postgres"
-        out: "internal/store/postgres/"
-        sql_package: "pgx/v5"
-        emit_interface: true
-        emit_json_tags: true
-```
-
-### DO — sqlc annotations
-
-```sql
--- name: GetUser :one
-SELECT * FROM users WHERE id = $1;
-
--- name: ListUsers :many
-SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2;
-
--- name: CreateUser :exec
-INSERT INTO users (name, email) VALUES ($1, $2);
-
--- name: UpdateUser :execrows
-UPDATE users SET name = $2, email = $3 WHERE id = $1;
-
--- name: DeleteUser :exec
-DELETE FROM users WHERE id = $1;
-```
-
-### DO NOT — sqlc traps
-
-| ❌ Wrong | ✅ Right |
-|---|---|
-| `:one` for query that might return 0 rows | `:one` returns `sql.ErrNoRows`; handle it |
-| Raw `database/sql` calls | Always go through sqlc-generated `Queries` |
-| `:exec` when you need affected rows | Use `:execrows` to get `sql.Result.RowsAffected()` |
-| Manual SQL in Go strings | Queries in `.sql` files; run `make sqlc` to regenerate |
-| `for rows.Next() { ... }` without `rows.Err()` | Always check `if err := rows.Err(); err != nil { return ... }` after the loop |
-
-**`rows.Err()` is mandatory.** After every `for rows.Next()` loop, you MUST check `rows.Err()`. A mid-iteration error (network drop, query cancel) silently returns partial results if unchecked. This applies to both sqlc-generated queries and raw pgx/sql calls.
-
-### DO — Store wrapper with transactions
+### DO — pgx error matching and row iteration
 
 ```go
-// internal/store/postgres/db.go
-type Store struct {
-    *Queries           // embeds sqlc-generated interface
-    pool *pgxpool.Pool
+// errors.Is, never ==
+if errors.Is(err, pgx.ErrNoRows) {
+    return nil, errs.NotFound("user %s not found", id)
 }
 
-func New(pool *pgxpool.Pool) *Store {
-    return &Store{
-        Queries: New(pool),
-        pool:    pool,
-    }
+// rows.Err() is MANDATORY after every rows.Next() loop
+for rows.Next() {
+    // ... scan ...
+}
+if err := rows.Err(); err != nil {
+    return nil, fmt.Errorf("iterate users: %w", err)
+}
+```
+
+A mid-iteration failure (network drop, cancel) silently truncates
+results if `rows.Err()` is unchecked. Audit EVERY repo loop — the bug
+hides in the one file that skips it.
+
+### DO — Guard degenerate lookup keys
+
+If a lookup key can legitimately be empty (`GetByExternalID("")`),
+return NotFound early instead of querying — empty keys can match legacy
+rows created before the column was populated.
+
+### DO — Store wrapper with transactions (sqlc)
+
+```go
+type Store struct {
+    *Queries          // sqlc-generated
+    pool *pgxpool.Pool
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(*Queries) error) error {
@@ -614,100 +640,64 @@ func (s *Store) WithTx(ctx context.Context, fn func(*Queries) error) error {
     }
     defer tx.Rollback(ctx) // no-op if committed
 
-    q := New(tx)
-    if err := fn(q); err != nil {
+    if err := fn(New(tx)); err != nil {
         return err
     }
     return tx.Commit(ctx)
 }
 ```
 
-## Common AI Hallucinations — Complete Reference
-
-### chi API Fabrications
-
-| ❌ DeepSeek says | ✅ Reality |
-|---|---|
-| `chi.Param(r, "id")` | `chi.URLParam(r, "id")` |
-| `chi.Query(r, "page")` | `r.URL.Query().Get("page")` |
-| `chi.Render(w, r, v)` | Write your own `render.JSON(w, code, v)` |
-| `chi.Bind(r, v)` | Use `json.NewDecoder(r.Body).Decode(v)` |
-| `chi.NewRouter()` typed as `*chi.Mux` | Returns `chi.Router` |
-| `chi.Get(r.Context())` | `chi.RouteContext(r.Context())` |
-| `middleware.DefaultLogger` | `middleware.Logger` |
-| `middleware.NewRecoverer()` | `middleware.Recoverer` |
-| `middleware.DefaultCompress` | `middleware.Compress(5, "application/json")` |
-
-### Import Traps
-
-| ❌ DeepSeek says | ✅ Reality |
-|---|---|
-| `import "github.com/go-chi/chi"` | `import "github.com/go-chi/chi/v5"` |
-| `import "io/ioutil"` | `import "io"` (ioutil deprecated in Go 1.16) |
-| `import "github.com/go-chi/chi/middlewares"` | `import "github.com/go-chi/chi/v5/middleware"` |
-| `import "github.com/go-chi/chi/cors"` | `import "github.com/go-chi/cors"` (separate module) |
-
-### Goroutine / Handler Traps
+### DO NOT — SQL traps
 
 | ❌ Wrong | ✅ Right |
 |---|---|
-| Launch goroutine with `r.Context()` | Derive new context: `context.Background()` or `context.WithTimeout(context.Background(), ...)` |
-| No panic recovery in goroutine | `defer func() { if r := recover(); r != nil { log.Error(...) } }()` |
-| `w.WriteHeader(200)` after `w.Write()` | Set status code BEFORE writing body |
-| Return 200 then write error body | Check errors FIRST, then write success OR error |
+| `fmt.Sprintf` user input into SQL | Parameterized `$1`, `$2` always |
+| Unvalidated enum from query param into a query branch | Validate against the allowed set in the handler first |
+| `:one` sqlc query that can return 0 rows unhandled | Handle `pgx.ErrNoRows` |
+| URL/port surgery with `strings.Replace` | Parse with `net/url`, set `u.Host` |
+
+## Interfaces
+
+- **Consumer side, minimal.** Handlers define the small interface of
+  service methods they need (`type userService interface { ... }`);
+  don't build god-interfaces on the producer side "for mocking"
+  (Go CR Comments: Interfaces).
+- **Hexagonal ports** (domain-package repository interfaces) are the
+  accepted exception when the codebase already uses them — match it.
+- **Verify compliance at compile time** where a type must implement a
+  port: `var _ domain.UserRepository = (*UserRepo)(nil)` — do it
+  consistently (all repos or none).
+- Inject the narrow dependency, not a getter for the concrete type
+  (`hub *Hub`, not `GetHub() *Hub` on a service interface).
+
+## Common AI Hallucinations — Import Traps
+
+| ❌ Hallucination | ✅ Reality |
+|---|---|
+| `import "github.com/go-chi/chi"` | `import "github.com/go-chi/chi/v5"` |
+| `import "io/ioutil"` | `import "io"` (deprecated since Go 1.16) |
+| `import "github.com/go-chi/chi/middlewares"` | `.../chi/v5/middleware` |
+| `import "github.com/go-chi/chi/cors"` | `github.com/go-chi/cors` (separate module) |
+
+**Before using any library API: grep go.mod and existing imports. If the
+package isn't already a dependency, STOP and ask — never introduce a new
+dependency silently.**
 
 ## WebSocket (nhooyr.io/websocket)
 
-This project uses **`nhooyr.io/websocket`** — not gorilla/websocket.
-The library is already in `go.mod`. Do NOT introduce gorilla/websocket.
+Check `go.mod` for the WebSocket library before writing code. These
+patterns assume `nhooyr.io/websocket`; do NOT import gorilla/websocket
+into a nhooyr codebase.
 
 ### Hub Pattern — Room-based broadcast
 
-Every WebSocket feature follows this pattern: a **Hub** (singleton, wired
-in `main.go`) manages rooms. Handlers upgrade connections and delegate
-read/write to the hub.
-
 ```go
-// domain/entity.go — shared across layers
-type Client struct {
-    UserID string
-    Send   chan []byte  // buffered channel (64 is a safe default)
-}
-```
-
-```go
-// application/hub.go — singleton, safe for concurrent use
 type Hub struct {
     mu    sync.RWMutex
-    rooms map[string]map[*domain.Client]bool // roomID → clients
+    rooms map[string]map[*domain.Client]bool
 }
 
-func NewHub() *Hub {
-    return &Hub{rooms: make(map[string]map[*domain.Client]bool)}
-}
-
-// Join adds a client to a room. Call from the handler after upgrade.
-func (h *Hub) Join(roomID string, c *domain.Client) {
-    h.mu.Lock()
-    defer h.mu.Unlock()
-    if h.rooms[roomID] == nil {
-        h.rooms[roomID] = make(map[*domain.Client]bool)
-    }
-    h.rooms[roomID][c] = true
-}
-
-// Leave removes a client. Always defer after Join.
-func (h *Hub) Leave(roomID string, c *domain.Client) {
-    h.mu.Lock()
-    defer h.mu.Unlock()
-    delete(h.rooms[roomID], c)
-    if len(h.rooms[roomID]) == 0 {
-        delete(h.rooms, roomID)
-    }
-}
-
-// Broadcast sends a message to every client in a room.
-// Uses non-blocking send: if a client's buffer is full, skip it.
+// Broadcast: non-blocking send; slow clients get dropped, not the room.
 func (h *Hub) Broadcast(roomID string, data []byte) {
     h.mu.RLock()
     defer h.mu.RUnlock()
@@ -720,292 +710,145 @@ func (h *Hub) Broadcast(roomID string, data []byte) {
 }
 ```
 
-### Handler — Upgrade + read/write pumps
+### Connection lifecycle — the invariant that prevents leaks
+
+**Any pump exiting must terminate ALL pumps for that connection.** The
+classic leak: handler blocks in `writePump` waiting on a channel, the
+client disconnects, `readPump` exits silently — and the handler goroutine
++ connection + channel leak until (unless) another broadcast arrives.
 
 ```go
-// adapter/http/handler.go
-import "nhooyr.io/websocket"
-import "nhooyr.io/websocket/wsjson"
-
 func (h *Handler) MyWebSocket(w http.ResponseWriter, r *http.Request) {
-    roomID := chi.URLParam(r, "roomID")
-
     conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-        InsecureSkipVerify: true, // allow non-browser clients (OBS, scripts)
+        OriginPatterns: allowedOrigins, // from config — NEVER InsecureSkipVerify
     })
     if err != nil {
-        h.logger.Error("ws accept", "error", err)
         return
     }
     defer conn.Close(websocket.StatusNormalClosure, "")
 
+    // One context governs both pumps; cancelled on ANY exit path.
+    connCtx, connCancel := context.WithCancel(context.Background())
+    defer connCancel()
+
     client := &domain.Client{
-        UserID: "...", // from auth or query param
-        Send:   make(chan []byte, 64),
+        Send:  make(chan []byte, sendBufferSize),
+        Close: connCancel, // lets the hub disconnect this client remotely
     }
 
     h.hub.Join(roomID, client)
     defer h.hub.Leave(roomID, client)
 
-    // Context for the connection lifetime. NOT derived from r.Context().
-    ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
-    defer cancel()
-
-    go h.readPump(ctx, conn, client)
-    h.writePump(ctx, conn, client)
+    go h.readPump(connCtx, connCancel, conn, client) // cancels on exit
+    h.writePump(connCtx, conn, client)               // unblocked by cancel
 }
 
-func (h *Handler) readPump(ctx context.Context, conn *websocket.Conn, client *domain.Client) {
-    defer conn.Close(websocket.StatusNormalClosure, "")
+func (h *Handler) readPump(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, client *domain.Client) {
+    defer cancel() // ← the leak fix: unblocks writePump when reads stop
     for {
         _, msg, err := conn.Read(ctx)
-        if err != nil { break }
-        // process msg, call service, broadcast via hub
-        h.hub.Broadcast(roomID, msg)
-    }
-}
-
-func (h *Handler) writePump(ctx context.Context, conn *websocket.Conn, client *domain.Client) {
-    for {
-        select {
-        case data, ok := <-client.Send:
-            if !ok { return }
-            wsjson.Write(ctx, conn, data) // or conn.Write(ctx, websocket.MessageText, data)
-        case <-ctx.Done():
+        if err != nil {
             return
         }
+        // process msg...
     }
 }
 ```
 
-### DO — WebSocket patterns
-
-- **Always derive a new context** for the connection lifetime. Never pass
-  `r.Context()` into goroutines — the HTTP request context is cancelled
-  when the handler returns.
-  ```go
-  ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
-  defer cancel()
-  ```
-
-- **Buffer the Send channel** (64 is a good default). Unbuffered channels
-  block the broadcaster if a single client is slow.
-  ```go
-  Send: make(chan []byte, 64)
-  ```
-
-- **Non-blocking broadcast.** The `select/default` pattern prevents a slow
-  client from stalling the entire room.
-  ```go
-  select {
-  case c.Send <- data:
-  default: // drop, client will catch up or reconnect
-  }
-  ```
-
-- **Always `defer conn.Close()`** with a status code. `StatusNormalClosure`
-  (1000) for clean shutdown, `StatusInternalError` (1011) for unexpected
-  errors.
-
-- **Use `wsjson.Write`** for structured JSON messages. It's simpler than
-  marshalling manually.
-  ```go
-  wsjson.Write(ctx, conn, myStruct)
-  ```
-
-- **Wire the hub in `main.go`** and pass it to the handler.
-  ```go
-  hub := chatapp.NewChatHub(chatRepo, logger)
-  chatSvc := chatapp.NewChatService(chatRepo, hub)
-  chatHandler := chathttp.NewChatHandler(chatSvc, logger)
-  ```
+**Remote disconnection (idle expiry, kicks):** if the hub removes
+clients from a room (`ExpireIdle`), the remover must close EVERY removed
+client's connection via its `Close` callback — removed clients receive
+no more broadcasts, so their pumps would otherwise never wake up
+(zombie connections).
 
 ### DO NOT — WebSocket traps
 
 | ❌ Wrong | ✅ Right |
 |---|---|
-| `import "github.com/gorilla/websocket"` | `import "nhooyr.io/websocket"` |
-| Pass `r.Context()` to WebSocket goroutines | `context.WithTimeout(context.Background(), 24*time.Hour)` |
-| Unbuffered `Send` channel | `make(chan []byte, 64)` |
-| Blocking broadcast (`c.Send <- data`) | Non-blocking `select/default` |
-| `conn.Close()` without status code | `conn.Close(websocket.StatusNormalClosure, "")` |
-| Manually `json.Marshal` then `conn.Write` | `wsjson.Write(ctx, conn, v)` for structs; `conn.Write(ctx, websocket.MessageText, data)` for pre-marshaled `[]byte` (avoids double base64-encoding) |
-| Skip `InsecureSkipVerify` for local dev | Use `OriginPatterns: []string{"localhost:3000"}` to validate Origin headers. **Never** use `InsecureSkipVerify: true` — it disables CSWSH protection. |
-| Call `wsjson.Write` from `readPump` goroutine | Route ALL writes through `writePump` via `client.Send` channel — `nhooyr.io/websocket` does not support concurrent writes |
-| Return HTTP error before WebSocket upgrade | **Accept the WebSocket first**, then close with a meaningful code (e.g., `websocket.StatusCode(4001)` for "stream offline") so the browser can receive close codes instead of opaque HTTP errors that trigger infinite reconnect loops |
-| Register WS route inside `AuthMiddleware` when auth is optional | Register outside the auth group, extract credentials manually with `extractToken()`, and allow anonymous connections (read-only) while requiring auth to send messages |
-
-### Testing WebSocket handlers
-
-Use `httptest.NewServer` to test end-to-end:
-
-```go
-func TestWebSocket(t *testing.T) {
-    hub := NewHub()
-    h := NewHandler(hub, testLogger())
-
-    r := chi.NewRouter()
-    r.Get("/ws/{roomID}", h.MyWebSocket)
-    ts := httptest.NewServer(r)
-    defer ts.Close()
-
-    wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws/room-1"
-    conn, _, err := websocket.Dial(context.Background(), wsURL, nil)
-    if err != nil {
-        t.Fatal(err)
-    }
-    defer conn.Close(websocket.StatusNormalClosure, "")
-
-    // Write a message
-    conn.Write(context.Background(), websocket.MessageText, []byte(`{"key":"val"}`))
-
-    // Read the response
-    _, msg, err := conn.Read(context.Background())
-    // ... assertions ...
-}
-```
+| Pass `r.Context()` to WS goroutines | Derive from `context.Background()` |
+| Unbuffered `Send` channel | Buffered (`make(chan []byte, 64)`) with named size constant |
+| Blocking broadcast (`c.Send <- data`) | Non-blocking `select`/`default` |
+| `InsecureSkipVerify: true` | `OriginPatterns` from config — hardcoded localhost origins break production |
+| Writes from multiple goroutines | ALL writes through one writePump; the library forbids concurrent writes |
+| Return HTTP error before upgrade | Accept first, then close with an application code (4000-4999) so browsers see close codes |
+| `websocket.StatusCode(4001)` inline | Named constant with a comment |
 
 ### Checklist for new WebSocket endpoints
 
-- [ ] Hub is a singleton wired in `main.go` (not created per-request)
-- [ ] Route registered OUTSIDE `AuthMiddleware` if auth is optional; extract credentials manually
-- [ ] WebSocket accepted BEFORE application-level validation (so close codes reach the browser)
-- [ ] All writes routed through single `writePump` goroutine via `client.Send` channel
-- [ ] `Send` channel is buffered (`make(chan []byte, 64)`)
-- [ ] Broadcast uses non-blocking `select/default`
-- [ ] Context derived from `context.Background()`, not `r.Context()`
-- [ ] `defer conn.Close(websocket.StatusNormalClosure, "")`
-- [ ] `defer hub.Leave(...)` after `hub.Join(...)`
-- [ ] `AcceptOptions` uses `OriginPatterns`, NOT `InsecureSkipVerify`
-- [ ] All injected dependencies nil-checked before use (hub, services)
-- [ ] Write goroutine has `defer recover()` for panic safety
-- [ ] Test uses `httptest.NewServer` + `websocket.Dial`
-- [ ] Test passes auth via `HTTPHeader` or context injection when WS route is outside auth group
+- [ ] Hub is a singleton wired in `main.go`
+- [ ] One conn context; readPump cancels it on exit; handler defers cancel
+- [ ] Remote-close callback set if the hub can remove clients
+- [ ] All writes via buffered Send channel through one writePump
+- [ ] `OriginPatterns` from configuration
+- [ ] Accept-then-close-with-code for application-level rejections
+- [ ] Test with `httptest.NewServer` + `websocket.Dial`
 
-### Third-Party Webhooks (SRS callbacks, Stripe, etc.)
+## Third-Party Webhooks
 
-When handling webhook callbacks from external services:
+- **Do NOT use `DisallowUnknownFields()`** — external services add
+  fields freely; decode only what you need.
+- **Match your struct to the ACTUAL payload of the version you run**,
+  not docs for another version. Field types change between versions
+  (e.g. an ID switching from number to string). Capture one real payload
+  and pin it in a table-driven test.
+- Verify a shared secret/signature before processing.
+- Reply with the exact body/status the service expects (some webhooks
+  require specific response bodies to consider delivery successful).
 
-- **Do NOT use `DisallowUnknownFields()`** — third-party services often send
-  extra metadata fields not relevant to your handler. Blocking them causes
-  the entire webhook to fail silently.
+## Subprocess Hygiene (ffmpeg and friends)
+
+- **Never discard stderr.** `cmd.Stderr = nil` hides all failure
+  evidence. Capture into a `bytes.Buffer`, log the tail on failure:
   ```go
-  // ❌ Rejects SRS callback because it sends ip, vhost, app, etc.
-  dec.DisallowUnknownFields()
-
-  // ✅ Only decode the fields you need, ignore the rest.
-  // SRS 5 sends client_id as a STRING connection id (e.g. "5u9c4d30"),
-  // not a number — always check the actual payload of the service version
-  // you run, not the docs of another version.
-  var body struct {
-      Action   string `json:"action"`
-      ClientID string `json:"client_id"`
-      Stream   string `json:"stream"`
+  var stderr bytes.Buffer
+  cmd.Stderr = &stderr
+  if err := cmd.Run(); err != nil && ctx.Err() == nil {
+      s.warnLog("capture failed", "err", err, "stderr", tail(stderr.String(), 500))
   }
-  dec := json.NewDecoder(r.Body)
-  dec.Decode(&body)
   ```
+- Suppress the failure log when `ctx.Err() != nil` — a killed-by-cancel
+  subprocess is expected, not an error.
+- **Retry sleeps must be context-aware**: `select { case <-ctx.Done():
+  return; case <-time.After(delay): }` — a bare `time.Sleep` delays
+  shutdown.
+- **Record to streaming containers (MPEG-TS), not indexed ones (MP4)**,
+  when the process may be SIGKILLed — MP4 loses its moov atom and
+  corrupts audio extradata. Remuxing TS→MP4 needs `-bsf:a aac_adtstoasc`.
+- **Verify media output with a decode pass**
+  (`ffmpeg -v error -i out -f null -`), not just exit status or file
+  existence.
 
-- **Match your struct to the actual payload**, not what you assume.
-  Read the service's documentation for the exact JSON field names.
-  Test with a real payload from the service (capture it once, use it
-  in a table-driven test).
+## Nil Guards for Injected Dependencies
 
-- **Verify file paths in the actual container.** Config directives like
-  `hls_path /data/hls` may be overridden by Docker image defaults.
-  Run `docker compose exec <svc> find / -name "*.m3u8"` to find where
-  files actually land.
-
-### SRS Integration (ossrs/srs:5)
-
-Traps that cost days when working with SRS in Docker:
-
-- **The image loads `conf/docker.conf`, NOT `conf/srs.conf`.** The
-  entrypoint log line says exactly which file it read
-  (`SRS on aarch64, conf:conf/docker.conf`). Mount your custom config at
-  `/usr/local/srs/conf/docker.conf`, otherwise your tuning silently never
-  applies and SRS runs image defaults (10s fragments, no callbacks).
-- **LL-HLS was removed in SRS 5.** `hls_ll_enabled` / `hls_ll_fragment`
-  fail config validation ("illegal vhost.hls.hls_ll_enabled"). Use short
-  full segments (`hls_fragment 2`) instead.
-- **`http_hooks` `client_id` is a string connection id** (`"5u9c4d30"`),
-  not the numeric HTTP-API client id. Store it as TEXT.
-- **`hls_ctx` is on by default** and wraps every playlist (including
-  static VOD playlists) in a master playlist whose child URI is
-  root-absolute (`/vods/...?...hls_ctx=...`). Behind a reverse proxy that
-  strips a path prefix (`/hls/*` → SRS), players resolve that URI against
-  the proxy origin and lose the prefix → 404. Set `hls_ctx off` unless you
-  need per-session HLS auth.
-- **SRS does not send duration in `on_unpublish`** — compute duration from
-  `started_at` when the callback provides none.
-
-### River (PostgreSQL Job Queue)
-
-River has sharp validation edges that produce confusing failures:
-
-- **Insert-only clients must register the job kind.** `Insert` fails with
-  "job kind is not registered in the client's Workers bundle" unless a
-  worker for the kind exists — even if this client never runs workers.
-  Register a noop worker:
-  ```go
-  workers := river.NewWorkers()
-  river.AddWorker[domain.Args](workers, &noopWorker{})
-  ```
-- **`Queues` set requires `Workers` set and `MaxWorkers >= 1`** — both
-  must be non-empty or `NewClient` errors.
-- **`client.Start()` is non-blocking** — block on a signal/ctx afterwards,
-  or the process exits immediately.
-- **Run `rivermigrate.Migrate()` before `NewClient`**, and make it
-  idempotent: if migration errors but `river_queue` already exists
-  (partial apply from a crash), verify the schema state and continue.
-
-### ffmpeg Subprocesses (Recording / Transcoding)
-
-- **Never discard subprocess stderr** (`cmd.Stderr = nil` hides all
-  failure evidence). Capture it into a buffer and log the tail on
-  failure.
-- **Record to MPEG-TS, not MP4, when the process may be killed abruptly.**
-  SIGKILL loses MP4's moov atom, which takes the AAC track's extradata
-  with it; a later `-c:a copy` remux then fails with "AAC bitstream not in
-  ADTS format and extradata missing" and writes garbage audio. TS is a
-  streaming container — no moov/index, ADTS passes through, safe to kill.
-- **Remuxing TS→MP4 needs `-bsf:a aac_adtstoasc`** (ADTS→ASC framing);
-  MP4→TS copy requires intact extradata.
-- **Verify output with a decode pass, not just exit status.**
-  `ffmpeg -v error -i out.ts -f null -` must emit zero errors. HTTP 200 +
-  file existence proves nothing about media validity.
-
-### Nil Guards for Injected Dependencies
-
-Services that accept dependencies via constructor injection (hub, repos,
-HTTP clients) must nil-check them before use — tests often construct
-services with `nil` for unused dependencies.
+Optional constructor-injected dependencies (hub, queue, logger) must be
+nil-checked before use — tests construct services with `nil` for unused
+collaborators. Apply the guard in EVERY file of the package, not just
+the one you're editing (grep call sites of the dependency).
 
 ```go
-func (s *StreamService) OnStreamStart(...) {
-    // ...
-    if s.hub != nil {
-        s.hub.NotifyStreamStarted(userID, stream.ID)
-    }
-    // ...
+if s.hub != nil {
+    s.hub.NotifyStarted(userID, id)
 }
 ```
 
-### Pre-Deploy Checklist
+## Pre-Deploy Checklist
 
 Before claiming an endpoint is "stable":
 - [ ] All four timeouts configured on `http.Server`
-- [ ] `MaxBytesReader` limits request body size on every POST/PATCH/PUT handler
-- [ ] `defer r.Body.Close()` after reading body (NOT on GET/HEAD handlers)
-- [ ] All JSON decoders use `DisallowUnknownFields()`
-- [ ] Error responses use the `errs.AppError` type system
-- [ ] No bare error returns — every layer-crossing error wrapped with `fmt.Errorf("ctx: %w", err)`
-- [ ] No `_ =` discarded errors — at minimum logged
-- [ ] Every `for rows.Next()` loop checks `rows.Err()` afterward
-- [ ] Table-driven tests cover: happy path + each error path + edge cases
-- [ ] Integration test hits the router with a real request
-- [ ] `go build ./...` and `go vet ./...` pass
-- [ ] Dev-default secrets log a `slog.Warn` at startup
-- [ ] Response shape verified against frontend types: `grep -A 20 "interface <Name>" frontend/src/types/index.ts` — all fields present, no extra fields, wrapper objects match
-- [ ] HTTP status codes are semantically correct: 409 for state conflicts (not 404), 400 for validation (not 500)
-- [ ] All handler inputs validated: required fields checked, enums checked, lengths checked — validation lives in the handler (HTTP layer), not the service
+- [ ] `main` uses the `run() error` pattern — exit once, defers run
+- [ ] `MaxBytesReader` limits body size on every POST/PATCH/PUT handler
+- [ ] JSON decoders on own-API inputs use `DisallowUnknownFields()`
+- [ ] Error responses use the `errs.AppError` kind system
+- [ ] No bare error returns; no `_ =` discards; handle-once respected
+- [ ] `errors.Is/As` for all sentinel/kind matching (no `==`)
+- [ ] Every `rows.Next()` loop checks `rows.Err()`
+- [ ] No package-level mutable state; comma-ok on all type assertions
+- [ ] Status strings are typed domain constants
+- [ ] Background goroutines stoppable + waited on during shutdown
+- [ ] Table-driven tests: happy + error + edge; integration test hits the router
+- [ ] `go build ./... && go vet ./... && gofmt -l .` all clean
+- [ ] Dev-default secrets log `slog.Warn` at startup
+- [ ] Response shape verified against the frontend type file
+- [ ] Status codes semantically correct: 409 state conflicts, 400 validation
+
+*Last updated: 2026-08-12*

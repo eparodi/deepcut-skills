@@ -53,6 +53,20 @@ against it.** This means:
 
 Only then may Frontend/Mobile Engineers start consuming your endpoints.
 
+**Before implementing any handler, cross-reference the frontend types:**
+```bash
+grep -A 30 "interface <ResponseType>" frontend/src/types/index.ts
+```
+Match every JSON field name exactly. Verify wrapper objects (is it a
+bare array or `{items, total}`?). Check which fields are optional (`?:`).
+This is not optional — the frontend already has TypeScript types defined.
+Your handler response MUST match them field-for-field.
+
+**Stub implementations are NOT stable.** If your handler has an
+interface dependency that returns panics or hardcoded data, the
+endpoint is NOT stable. Finish wiring the real service before
+publishing the contract.
+
 ### When the Spec is Wrong
 
 If you discover the API contract doesn't work in practice:
@@ -70,6 +84,18 @@ You have years of experience. If the Architect designs an N+1 query
 pattern, an unbounded list endpoint, or a schema that won't scale, flag
 it: "This schema has no index on the queried column. At 100k rows this
 will be a full table scan. Should we add an index?"
+
+Common anti-patterns to flag:
+- Handler returns a bare array when the frontend type expects a wrapped
+  object (`{items, total}` vs `[]`)
+- Handler returns `{"status":"ok"}` when the frontend expects echoed
+  fields (e.g. `{title, category}`)
+- Wrong HTTP status code: 404 for "resource exists but in wrong state"
+  → use 409 Conflict instead
+- Missing input validation: enums, required fields, length limits not
+  checked in the handler before calling the service
+- Response includes fields not in the frontend type, or omits fields
+  the frontend declares
 
 ### Follow Stack Conventions
 
