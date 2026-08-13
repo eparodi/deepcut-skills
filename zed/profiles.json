@@ -126,6 +126,48 @@
         "exclude": ["backend/", "frontend/"]
       }
     },
+    "ai-engineer": {
+      "display_name": "AI Engineer (Senior)",
+      "skills": ["ai-engineer", "spec-driven"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": true,
+        "fetch": true
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "claude-opus",
+        "reasoning": "Implements the LLM layer: provider client, malformed-response ladder, retries/breaker, token telemetry, cost-budget mechanism. Implementation-only — full write/terminal scoped to the LLM layer. Fetch enabled because verifying provider docs and capturing real payloads is core to the role."
+      },
+      "write_scope": {
+        "include": ["backend/", "specs/"],
+        "exclude": ["frontend/", "mobile/"]
+      }
+    },
+    "financial-analyst": {
+      "display_name": "Financial Analyst (Senior)",
+      "skills": ["financial-analyst"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": false,
+        "fetch": true
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "claude-opus",
+        "reasoning": "Owns the trading system's money semantics: risk rules, sizing, breaker, PnL/fee accounting — never writes implementation code. Out of scope: project finances and API bills. Fetch enabled to verify financial sources under the serious-source (anti-scam) rule."
+      }
+    },
     "orchestrator": {
       "display_name": "Master Orchestrator (Single-Thread Team)",
       "skills": ["orchestrator", "spec-driven", "go-chi", "nextjs"],
@@ -146,6 +188,6 @@
       }
     }
   },
-  "version": "1.2.0",
+  "version": "1.3.0",
   "last_updated": "2026-08-13"
 }

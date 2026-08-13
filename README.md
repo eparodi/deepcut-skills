@@ -11,9 +11,10 @@ This project front-loads quality by enforcing **spec-first planning** and
 **role-based guardrails** so misunderstandings get caught in cheap markdown
 edits instead of expensive code rewrites.
 
-It simulates a nine-person team — PM, Architect, UX Designer, three
-Engineers, Reviewer, QA, and Security Engineer — each in its own Zed
-agent thread, coordinated through a shared `specs/` directory.
+It simulates an eleven-person team — PM, Architect, UX Designer,
+Engineers (backend, frontend, mobile, AI), Financial Analyst,
+Reviewer, QA, and Security Engineer — each in its own Zed agent
+thread, coordinated through a shared `specs/` directory.
 
 ## Quick Start
 
@@ -41,6 +42,8 @@ Open one Zed agent thread per role. Load the corresponding skill:
 | Backend Eng | `backend-engineer` + `go-chi` | `@backend-engineer @go-chi` |
 | Frontend Eng | `frontend-engineer` + `nextjs` | `@frontend-engineer @nextjs` |
 | Mobile Eng | `mobile-engineer` + `expo` | `@mobile-engineer @expo` |
+| AI Engineer | `ai-engineer` | `@ai-engineer` |
+| Financial Analyst | `financial-analyst` | `@financial-analyst` |
 | Reviewer | `reviewer` | `@reviewer` |
 | QA | `qa` | `@qa` |
 | Security Eng | `security-engineer` | `@security-engineer` |
@@ -181,7 +184,7 @@ A four-phase, gated process with human checkpoints between phases:
 Requirements → [approve] → Design → [approve] → Tasks → Implement
 ```
 
-### Nine Role Skills
+### Eleven Role Skills
 
 | Role | Skill | Owns | Can Write Code? |
 |------|-------|------|:---:|
@@ -191,11 +194,13 @@ Requirements → [approve] → Design → [approve] → Tasks → Implement
 | **Backend Eng** | `backend-engineer` | `backend/` — Go/chi, database, API implementation | ✅ |
 | **Frontend Eng** | `frontend-engineer` | `frontend/` — Next.js App Router, Server Components | ✅ |
 | **Mobile Eng** | `mobile-engineer` | `mobile/` — Expo/React Native managed workflow | ✅ |
+| **AI Engineer** | `ai-engineer` | The LLM layer — provider client, malformed-response ladder, retries/breaker, token telemetry, cost-budget mechanism | ✅ (llm scope) |
+| **Financial Analyst** | `financial-analyst` | The system's trading money — risk rules, position sizing, capital policy, PnL/fee accounting, serious-source discipline | ❌ |
 | **Reviewer** | `reviewer` | PR correctness, style, security, standards adherence | ❌ |
 | **QA** | `qa` | Test suites, API contracts, UI states, spec compliance | ❌ |
 | **Security Eng** | `security-engineer` | Vulnerability audits, penetration testing, OWASP compliance, security standards | ❌ |
 
-All nine roles are framed as **senior** practitioners — they have guardrails
+All eleven roles are framed as **senior** practitioners — they have guardrails
 to flag design flaws, not just blindly implement specs.
 
 Planning roles (PM, Architect, UX Designer) produce design artifacts in
@@ -238,7 +243,9 @@ just want one agent to build and self-verify.
 
 Three ~2,000-line reference documents covering every non-obvious pattern,
 trap, and best practice for each stack. Used as source material for the
-stack skills but kept for deeper reference.
+stack skills but kept for deeper reference. Plus `docs/research/` holds
+the verified source bases for the two new roles (`ai-engineer-sources.md`,
+`financial-role-sources.md` — every citation marked verified/unverified).
 
 ## Project Structure
 
@@ -263,6 +270,8 @@ your-monorepo/
 │       ├── reviewer/SKILL.md         # PR correctness + standards review
 │       ├── qa/SKILL.md               # Test suites + API contract verification
 │       ├── security-engineer/SKILL.md# Vulnerability audits + pen-testing
+│       ├── ai-engineer/SKILL.md      # LLM layer implementation (ladder, retries, telemetry)
+│       ├── financial-analyst/SKILL.md# Trading money: risk rules, sizing, serious-source discipline
 │       ├── go-chi/SKILL.md           # Go/chi stack standards
 │       ├── nextjs/SKILL.md           # Next.js stack standards
 │       ├── expo/SKILL.md             # Expo/RN stack standards
