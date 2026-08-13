@@ -78,6 +78,10 @@ working autonomously — no "Should I...?" checkpoints. It tracks progress
 in `PLAN.md` and `LOOP_LOG.md` (gitignored working docs) and stops only
 when every subtask is `[X]` or it is genuinely blocked.
 
+> If you copy this toolkit into an existing repo, add the two anchored
+> patterns from this repo's `.gitignore` (`/PLAN.md`, `/LOOP_LOG.md`) to
+> your own so the orchestrator's working docs stay out of commits.
+
 ## Per-Feature Walkthrough
 
 Here's exactly what to paste in each Zed agent thread, per phase.
