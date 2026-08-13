@@ -6,7 +6,8 @@ description: Next.js App Router development standards — Server Components, dat
 # Next.js App Router Standards
 
 You are writing Next.js code using the App Router with Server Components
-as the default. Follow these conventions exactly.
+as the default. Follow these conventions exactly. When your instinct (or
+a plausible-looking API) contradicts this document, trust this document.
 
 ## Project Layout (Monorepo)
 
@@ -326,6 +327,17 @@ export default function NotFound() {
 }
 ```
 
+**Route-segment completeness rule:** every route segment whose page
+fetches data server-side MUST ship `error.tsx` and `loading.tsx`, and
+`not-found.tsx` when the page calls `notFound()`. Also ship a root
+`app/error.tsx` and `app/not-found.tsx` — without them, a page that
+re-throws lands on Next's unbranded default screen. Audit:
+
+```bash
+# every segment with a server-fetching page should appear with all three
+ls src/app/**/page.tsx src/app/**/error.tsx src/app/**/loading.tsx
+```
+
 ### DO NOT — Layout mistakes
 
 | ❌ Wrong | ✅ Right |
@@ -405,6 +417,36 @@ export async function generateMetadata(
 | `export const metadata` in Client Component | Must be in Server Component (or layout) |
 | `params.id` in `generateMetadata` | `const { id } = await params` in Next.js 15+ |
 
+## Suspense & useSearchParams
+
+**`useSearchParams()` requires a `<Suspense>` boundary** above the
+component that calls it — otherwise `next build` fails during static
+generation (the error is masked while something else forces the whole
+app dynamic, then bites later). Pattern: export a wrapper.
+
+```tsx
+function SearchContent() {
+  const searchParams = useSearchParams();
+  // ...
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<main className="..." />}>
+      <SearchContent />
+    </Suspense>
+  );
+}
+```
+
+The same applies to shared client components (grids, filters) that read
+search params — wrap inside the component itself so every caller is
+safe.
+
+**Root-layout dynamic trap:** calling `cookies()`/`headers()` in the
+root layout forces EVERY route in the app to dynamic rendering. Read
+request data as deep in the tree as possible.
+
 ## Middleware
 
 ### DO — Edge-compatible middleware
@@ -442,7 +484,7 @@ export const config = {
 
 ### Fake Next.js APIs
 
-| ❌ DeepSeek says | ✅ Reality |
+| ❌ Hallucination | ✅ Reality |
 |---|---|
 | `NextAPIResponse` | `NextResponse` |
 | `NextAPIRequest` | `NextRequest` |
@@ -458,7 +500,7 @@ export const config = {
 
 ### "use client" / "use server" Fabrications
 
-| ❌ DeepSeek says | ✅ Reality |
+| ❌ Hallucination | ✅ Reality |
 |---|---|
 | `"use static"` directive | Does not exist |
 | `"use edge"` directive | Does not exist |
@@ -467,31 +509,189 @@ export const config = {
 
 ### Import Traps
 
-| ❌ DeepSeek says | ✅ Reality |
+| ❌ Hallucination | ✅ Reality |
 |---|---|
 | `import { useRouter } from "next/router"` | `import { useRouter } from "next/navigation"` |
 | `import { useActionState } from "react-dom"` | `import { useActionState } from "react"` |
 | `import { Link } from "next/link"` | `import Link from "next/link"` (default export) |
 | `import { headers, cookies } from "next/headers"` and not awaiting | `headers()` and `cookies()` return Promises in Next.js 15+ |
 
+## API Layer Discipline
+
+**One API client module; pages and components never call `fetch`
+directly for backend data.** Raw fetches bypass typed responses, error
+classes, and shared config — and they inevitably re-implement helper
+functions that already exist unused in the client.
+
+- Define every request as an exported, typed function in `lib/api.ts`
+  (fetcher + request/response types from `types/`).
+- Export the base URL constant from the client module. Grep before
+  adding another `process.env.NEXT_PUBLIC_API_URL || "..."` — divergent
+  fallbacks across files (3000 in one, 8081 in another) send users to
+  different origins.
+- Throw a typed error class (`ApiError` with `status`) from the client;
+  callers use `error instanceof ApiError` — never structural checks
+  like `"status" in error` with casts.
+- Audit: `grep -rn "fetch(" src/app src/components` — every hit outside
+  the API client needs a justification (streaming, third-party).
+
+**Error state ≠ empty state.** A failed fetch must never render the
+"nothing here yet!" empty state — catch failures separately and show an
+error block (or throw to the segment's error boundary):
+
+```tsx
+// ❌ Backend down renders "No items yet. Create the first one!"
+catch { return { items: [] }; }
+
+// ✅ Distinguish failure from genuinely empty
+catch { return { items: [], loadFailed: true }; }
+```
+
+## WebSocket / Effect Lifecycle
+
+**The disposed-flag pattern is mandatory for WebSockets with reconnect
+logic.** The browser fires `onclose` AFTER your cleanup calls
+`ws.close()` — an unguarded `onclose` schedules a reconnect that
+re-creates sockets and intervals which outlive the component (a leak
+that also explains "StrictMode double-connect" symptoms).
+
+```tsx
+useEffect(() => {
+  let disposed = false;
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout>;
+  let attempt = 0;
+
+  function connect() {
+    ws = new WebSocket(url);
+    ws.onopen = () => { attempt = 0; };
+    ws.onclose = () => {
+      if (disposed) return;                       // ← the fix
+      if (attempt < 10) {
+        const delay = Math.min(1000 * 2 ** attempt, 30_000);
+        attempt += 1;
+        reconnectTimer = setTimeout(connect, delay); // backoff + cap
+      }
+    };
+    ws.onerror = () => ws?.close();
+  }
+  connect();
+
+  return () => {
+    disposed = true;              // 1. mark disposed FIRST
+    clearTimeout(reconnectTimer); // 2. kill pending reconnects
+    if (ws) {                     // 3. detach handlers, then close
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
+      ws.close();
+    }
+  };
+}, [url]);
+```
+
+Rules that fall out of this:
+- Reconnects always use exponential backoff with a max-attempt cap —
+  a fixed short delay hammers a downed backend forever.
+- WS URLs derive from env config (`NEXT_PUBLIC_WS_URL`), never a
+  hardcoded `ws://localhost:...` — that breaks every non-local deploy
+  and is mixed-content-blocked under https.
+- Any interval/timeout created inside a socket handler must be cleared
+  in the same cleanup.
+
+## Fetch Races (AbortController)
+
+Any user-triggered fetch that can overlap (search-as-you-type, submit +
+load-more, filter changes) must abort the previous request or stale
+responses will overwrite fresh ones:
+
+```tsx
+const abortRef = useRef<AbortController | null>(null);
+
+async function performSearch(q: string) {
+  abortRef.current?.abort();
+  const controller = new AbortController();
+  abortRef.current = controller;
+  try {
+    const result = await searchItems({ query: q }, { signal: controller.signal });
+    setState(/* ... */);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") return; // superseded
+    setState({ status: "error", query: q });
+  }
+}
+```
+
+Companion rules:
+- **Pagination uses the executed query, not the live input.** Store the
+  query that produced the current results in the results state; "load
+  more" reads that, never the input box value (typing without submitting
+  must not mix result sets).
+- Auto-search effects key off the actual URL param value — a one-shot
+  `useRef(false)` guard breaks client-side `?q=a → ?q=b` navigation.
+- Pass `{ signal }` through your API-client functions as an optional
+  options param.
+
 ## Component Patterns & Anti-Patterns
 
-### DO — Extract duplicated components
+### DO — Extract duplicated components and helpers
 
-If you find the same component/function defined in 3+ files, extract to a shared file.
-Common culprits:
+If you find the same component/function defined in 2+ files, extract to
+a shared file (`lib/format.ts`, `components/ui/`). Common culprits:
 - `Spinner` / `LoadingSpinner`
-- `formatDate` / `formatNumber`
+- `formatCount` / `formatNumber` / `formatDuration` / date formatting
 - `EmptyState` with icon + message
+- Skeleton markup duplicated between `loading.tsx` and in-component
+  loading states
+
+Duplicated helpers WILL drift (one file's `1.2k` becomes another's
+`1.2K`) — that is a visible UI inconsistency, not just tech debt.
+Before writing a formatting helper: `grep -rn "function format" src/`.
 
 ```tsx
 // ❌ Wrong — duplicated in 3 files
-// UserForm.tsx, PostForm.tsx, SettingsForm.tsx
 function Spinner() { return <svg className="animate-spin" ... />; }
 
 // ✅ Right — shared component
 // components/ui/Spinner.tsx
 export function Spinner() { return <svg className="animate-spin" ... />; }
+```
+
+### DO — img onError fallbacks
+
+Every `<img>` whose `src` can 404 (avatars from third parties,
+generated thumbnails) needs an `onError` fallback to an inline data-URI
+placeholder — otherwise users see the broken-image icon. Keep the
+fallbacks in one module (`lib/fallbacks.ts`):
+
+```tsx
+<img
+  src={avatarUrl}
+  onError={(e) => {
+    const target = e.target as HTMLImageElement;
+    target.onerror = null; // prevent loops if the fallback also errors
+    target.src = AVATAR_FALLBACK;
+  }}
+/>
+```
+
+Note: an `onError` handler makes the component a Client Component —
+say so in the `"use client"` comment (not a made-up reason like
+"needed for Link navigation"; `<Link>` works in Server Components).
+
+### DO — Derive, don't duplicate, state
+
+State that is computable from other state is a bug factory — compute it
+during render instead:
+
+```tsx
+// ❌ charCount can drift from message
+const [message, setMessage] = useState("");
+const [charCount, setCharCount] = useState(0);
+
+// ✅ derived
+const [message, setMessage] = useState("");
+const charCount = message.length;
 ```
 
 ### DO NOT — Module-level mutable state
@@ -570,92 +770,50 @@ parent and trigger unwanted behavior.
 >
 ```
 
+### Testing — vi.mock and class exports
+
+When a module exports both functions AND classes (an API client with an
+`ApiError` class), a factory mock that only stubs the functions makes
+the class `undefined` — `instanceof` checks in the code under test then
+throw or silently fail. Preserve real exports with `importOriginal`:
+
+```ts
+// ❌ ApiError becomes undefined; `err instanceof ApiError` breaks
+vi.mock("@/lib/api", () => ({ getChannel: vi.fn() }));
+
+// ✅ keep the real module, stub only what the test controls
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return { ...actual, getChannel: vi.fn() };
+});
+```
+
+And reject with the REAL error class in tests
+(`new ApiError(404, {...})`), not a structurally-similar plain object.
+
 ### Pre-Deploy Checklist
 
 Before opening a PR for a frontend component:
-- [ ] No `"use client"` unless the component uses hooks, event handlers, or browser APIs
+- [ ] No `"use client"` unless the component uses hooks, event handlers, browser APIs, or img onError — and the comment states the REAL reason
 - [ ] Server Components fetch data, Client Components receive it via props
-- [ ] Each component has: loading state (skeleton), empty state, error state
+- [ ] Each component has: loading state (skeleton), empty state, error state — and error is NOT rendered as empty
+- [ ] Every server-fetching route segment has `error.tsx` + `loading.tsx` (+ `not-found.tsx` if it 404s); root `error.tsx`/`not-found.tsx` exist
+- [ ] All backend calls go through the shared API client; no raw `fetch(` in pages/components
+- [ ] WebSockets/effects use the disposed-flag cleanup; reconnects have backoff + cap
+- [ ] Overlapping fetches abort stale requests (AbortController)
+- [ ] `useSearchParams()` callers are wrapped in `<Suspense>`
+- [ ] Internal navigation uses `<Link>`, not `<a href>`
 - [ ] No module-level mutable variables — use `useState` + `useEffect` or React `cache()`
 - [ ] No duplicated utility functions or UI components — extract to shared files
+- [ ] No hardcoded origins — URLs derive from the shared base constant / env vars
 - [ ] `npx tsc --noEmit` passes
 - [ ] `npm run lint` passes (with `--max-warnings 0` — CI enforces this)
+- [ ] `npm run build` passes (catches Suspense/prerender errors tsc misses)
 - [ ] At minimum a render test for each component
 - [ ] **Test-first:** the render test for each distinct state (loading,
   empty, error, populated) is written and shown failing BEFORE the
   component renders that state; bug fixes get a failing regression test
   first (AGENTS.md §5.2, spec-driven skill Phase 4)
-- [ ] Vitest config uses `fileURLToPath` for cross-platform path aliases (not `.pathname`)
-- [ ] All vitest functions (`describe`, `it`, `expect`, `vi`, `beforeEach`, `afterEach`) imported explicitly — do not rely on `globals: true`
-- [ ] No hardcoded external URLs in `next.config.ts` — use env vars with sensible defaults (see Config Files section)
-
-### Config Files — Never Hardcode External URLs
-
-Any external service URL in `next.config.ts` (rewrite destinations, image domains,
-etc.) must be configurable via an environment variable, never hardcoded:
-
-```ts
-// ❌ Hardcoded — breaks in any environment other than local
-destination: "http://localhost:8081/api/:path*",
-
-// ✅ Configurable — works in dev, staging, and production
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8081";
-destination: `${BACKEND_URL}/api/:path*`,
-```
-
-### WebSocket — Bypass Next.js Proxy
-
-Next.js's built-in proxy (`rewrites` in `next.config.ts` or middleware) handles HTTP
-requests but does **not** support WebSocket upgrade proxying. WebSocket URLs must
-always point directly to the backend:
-
-```ts
-// ❌ Goes through Next.js proxy — WS upgrade fails
-const wsUrl = `ws://localhost:3000/ws/chat/${streamId}`;
-
-// ✅ Points directly to the backend
-const WS_HOST = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:8081";
-const url = new URL(WS_HOST);
-const wsUrl = `${url.protocol === "https:" ? "wss:" : "ws:"}//${url.host}/ws/chat/${streamId}`;
-```
-
-In production behind a reverse proxy (nginx, Cloudflare) that supports WebSocket
-upgrades at the edge, `WS_HOST` can match the API URL.
-
-### WebSocket — Deduplicate Messages by ID in React State
-
-React StrictMode (development only) double-invokes `useEffect`. If your effect
-opens a WebSocket and the server sends an initial message batch on connect, you'll
-receive the same batch twice — both appended to the same undrained `messages` array.
-Deduplicate by message ID in the `onmessage` handler:
-
-```tsx
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.type === "message") {
-    setMessages((prev) => {
-      const msg = data.payload;
-      // Skip if we already have this message ID
-      if (prev.some((m) => m.id === msg.id)) return prev;
-      return [...prev, msg];
-    });
-  }
-};
-```
-
-### HTML — Always Set `type="button"` on Buttons Near Inputs
-
-A `<button>` without an explicit `type` attribute defaults to `type="submit"`.
-Pressing Enter in a nearby `<input>` triggers both your `onKeyDown` handler AND
-the browser's implicit form submission on the submit button, causing double-fires:
-
-```tsx
-// ❌ Enter triggers BOTH onKeyDown AND implicit submit → double-send
-<button onClick={handleSend}>Send</button>
-
-// ✅ Explicit type prevents implicit submission
-<button type="button" onClick={handleSend}>Send</button>
-```
 
 ### React Patterns — `useRef` vs `useState`
 
@@ -693,4 +851,4 @@ const Mock = (props: Props) => <div>{props.used}</div>;
 Alternatively, configure `argsIgnorePattern: "^_"` in `eslint.config` to
 enable underscore-prefix suppression globally.
 
-*Last updated: 2026-08-10*
+*Last updated: 2026-08-12*

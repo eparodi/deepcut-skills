@@ -477,7 +477,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 ### Non-Existent React Native APIs
 
-| ❌ DeepSeek says | ✅ Reality |
+| ❌ Hallucination | ✅ Reality |
 |---|---|
 | `<div>`, `<span>`, `<p>` | `<View>`, `<Text>` |
 | `className` | `style={styles.xxx}` |
@@ -489,7 +489,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 ### Non-Existent Expo APIs
 
-| ❌ DeepSeek says | ✅ Reality |
+| ❌ Hallucination | ✅ Reality |
 |---|---|
 | `import { Camera } from "react-native-camera"` | Use `expo-camera` (managed workflow) |
 | `import { Camera } from "expo-camera"` with `<Camera ref={...}>` | `expo-camera` v7+ uses `useCameraPermissions()` + `<CameraView>` |
@@ -512,7 +512,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 ### Import Traps
 
-| ❌ DeepSeek says | ✅ Reality |
+| ❌ Hallucination | ✅ Reality |
 |---|---|
 | `import { useRouter } from "next/router"` | `import { router } from "expo-router"` |
 | `import { Link } from "react-router-native"` | `import { Link } from "expo-router"` |

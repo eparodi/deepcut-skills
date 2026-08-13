@@ -94,7 +94,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 - **JWT**: ES256 or RS256 preferred. HMAC only if the secret is >= 256 bits and not shared. Reject `alg: none`.
 - **TLS**: Minimum TLS 1.2, prefer TLS 1.3. No weak ciphers.
 - **Hash Functions**: SHA-256 (minimum), SHA-384, SHA-512. No MD5, SHA-1.
-- **Stream Key Storage**: Hash before storing (SHA-256), never store raw keys.
+- **Long-Lived Secret Storage** (API keys, stream keys): Hash before storing (SHA-256), never store raw keys.
 
 ### Go-Specific Security Patterns
 
@@ -156,7 +156,7 @@ grep -rn "dangerouslySetInnerHTML\|innerHTML" --include="*.tsx" .
 - [ ] Does the JWT implementation reject `alg: none`? (Should be implicit with `jwt.Parse` + key func)
 - [ ] Are there any endpoints that skip auth entirely but should require it?
 - [ ] Is there any IDOR risk? (Can user A access user B's resources by changing an ID?)
-- [ ] Are stream keys hashed (SHA-256 minimum) before storage?
+- [ ] Are long-lived secret keys (API keys, stream keys) hashed (SHA-256 minimum) before storage?
 - [ ] Is the OAuth state parameter validated against a session/cookie?
 - [ ] Is the redirect URI validated to prevent open redirect attacks?
 
@@ -177,10 +177,7 @@ grep -rn "dangerouslySetInnerHTML\|innerHTML" --include="*.tsx" .
 - [ ] Error responses do NOT leak stack traces or internal details.
 - [ ] All endpoints return appropriate HTTP status codes.
 - [ ] WebSocket endpoints authenticate before upgrading.
-- [ ] WebSocket connections use `OriginPatterns`, **never** `InsecureSkipVerify: true`.
-- [ ] Management/API ports (e.g., SRS 1985) are NOT exposed in docker-compose.
-- [ ] Callback/webhook auth is always enforced; never skip-when-empty.
-- [ ] HLS/stream URLs do NOT expose raw stream keys (use hash or UUID paths).
+- [ ] WebSocket connections have origin validation enabled.
 
 ### 5. Dependency & Supply Chain
 
@@ -219,24 +216,24 @@ docker compose ps
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/me
 # Expected: 401
 
-# Test CORS: preflight from disallowed origin
+# Test CORS: preflight from disallowed origin (use any public GET endpoint)
 curl -s -o /dev/null -w "%{http_code}" \
   -H "Origin: http://evil.com" \
   -H "Access-Control-Request-Method: GET" \
-  -X OPTIONS http://localhost:8081/api/streams/live
+  -X OPTIONS http://localhost:8081/api/<public-endpoint>
 
 # Test security headers
-curl -sI http://localhost:8081/api/health
+curl -sI http://localhost:8081/health
 
-# Test IDOR: try to access another user's data
-curl -s http://localhost:8081/api/channel/00000000-0000-0000-0000-000000000000
+# Test IDOR: request another user's resource by ID
+curl -s http://localhost:8081/api/<resource>/00000000-0000-0000-0000-000000000000
 
-# WebSocket: try connecting without auth
-# (manual – note that the WS endpoint takes userId/userName from query params)
+# WebSocket: try connecting without auth (manual — check how the WS
+# endpoint derives identity; query-param identity is a red flag)
 
-# Rate limiting: send rapid requests
+# Rate limiting: send rapid requests to a public endpoint
 for i in $(seq 1 100); do
-  curl -s -o /dev/null -w "%{http_code} " http://localhost:8081/api/streams/live
+  curl -s -o /dev/null -w "%{http_code} " http://localhost:8081/api/<public-endpoint>
 done
 ```
 
