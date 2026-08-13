@@ -356,6 +356,40 @@ When start-of-X spawns goroutines (recording, monitoring), extract ONE
 the callback path, the poller path, the force-end path, the interrupt
 path. Divergent teardown between paths is how goroutine/disk leaks ship.
 
+**When multiple paths can END the same entity, the completion itself
+must be idempotent — shared cleanup is not enough.** If a webhook
+callback, a poller, and a manual "force end" API can all finalize the
+same record, they race: whoever runs second repeats analytics writes
+(over-counting), re-notifies subscribers, or overwrites state the first
+path just set. Make the first write a compare-and-swap and do the
+follow-up work only if YOU won it:
+
+```go
+// repo: conditional update returns whether it actually transitioned
+cmd, err := pool.Exec(ctx, `
+    UPDATE streams SET ended_at = now(), status = 'offline'
+    WHERE id = $1 AND status = 'live'`, id)
+// ...
+return cmd.RowsAffected() > 0, nil // (bool, error)
+
+// service: single finalize used by every end path
+func (s *Svc) finalize(ctx context.Context, entity *Entity, ...) error {
+    ended, err := s.repo.EndIfLive(ctx, entity.ID, ...)
+    if err != nil {
+        return fmt.Errorf("end: %w", err)
+    }
+    if !ended {
+        return nil // another path already finalized it — no-op
+    }
+    // only the winner: notifications, analytics, follow-up jobs
+    ...
+}
+```
+
+Every end path then routes through that one `finalize`, and the
+"already ended" case must be covered by a test that asserts the loser
+performs NO follow-up writes.
+
 ## Error Handling
 
 ### DO — Error types
