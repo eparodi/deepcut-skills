@@ -23,6 +23,51 @@ routine implementation.
 
 ---
 
+## Single-Thread Orchestrator Mode (Alternative Setup)
+
+Running nine threads is the full-team ceremony. When you don't need it —
+the spec is already approved, or the task is a well-scoped bugfix — you
+can run the whole build loop in **one** thread:
+
+```
+@orchestrator I need to [goal]. Go until PLAN.md is fully checked off.
+```
+
+The `orchestrator` skill turns the single agent into a simulated 4-role
+team that loops internally:
+
+```
+PLANNER  → discovers the repo's stack/test commands (Phase 0), writes/updates PLAN.md
+CODER    → implements the current subtask
+REVIEWER → runs the repo's build/lint/test commands + ALWAYS-CHECKS
+   PASS  → mark [X], next subtask
+   FAIL  → DEBUGGER root-causes and fixes, back to REVIEWER
+```
+
+It tracks every iteration in `LOOP_LOG.md` (so it never repeats a failed
+fix) and is forbidden from asking "Should I...?" — it works until every
+`PLAN.md` line is `[X]` or it is physically blocked.
+
+### When to use which
+
+| Situation | Use |
+|-----------|-----|
+| New feature, requirements/design not yet reviewed by a human | Multi-thread `spec-driven` flow (gates matter) |
+| Spec approved, just build it | Orchestrator (one thread) |
+| Bugfix, refactor, or small chore with clear scope | Orchestrator (one thread) |
+| Cross-cutting architecture decisions or security-sensitive work | Multi-thread flow + Claude Opus, or at least set `heavy: claude-opus` on the orchestrator profile |
+
+Trade-off: the orchestrator's REVIEWER is the same model that wrote the
+code, so it is a weaker check than a separate reviewer thread. Compensate
+by keeping subtasks small (each one's verification command must actually
+run) and by escalating to a stronger model when the loop stalls.
+
+Both modes share the same `specs/` directory, the same `AGENTS.md` rules,
+and the same build/test commands, so you can switch modes mid-feature
+without losing work.
+
+---
+
 ## The Specs Directory
 
 ```

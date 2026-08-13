@@ -125,8 +125,27 @@
         "include": ["mobile/", "specs/"],
         "exclude": ["backend/", "frontend/"]
       }
+    },
+    "orchestrator": {
+      "display_name": "Master Orchestrator (Single-Thread Team)",
+      "skills": ["orchestrator", "spec-driven", "go-chi", "nextjs"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek",
+        "heavy": "claude-opus",
+        "reasoning": "One agent simulates PLANNER/CODER/REVIEWER/DEBUGGER and loops until PLAN.md is fully checked off. Full read/write/terminal — needs to work across the whole repo with no write scope restrictions. Escalate to Claude Opus if the loop stalls on a hard-to-reverse design decision."
+      }
     }
   },
-  "version": "1.1.0",
-  "last_updated": "2026-08-06"
+  "version": "1.2.0",
+  "last_updated": "2026-08-13"
 }
