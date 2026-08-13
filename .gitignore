@@ -1,3 +1,6 @@
 # Orchestrator working docs (temporary; specs/ is the committed source of truth)
 /PLAN.md
 /LOOP_LOG.md
+
+specs/memories/**
+!specs/memories/README.md
