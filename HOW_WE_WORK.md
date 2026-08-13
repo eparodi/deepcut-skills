@@ -13,6 +13,8 @@ role skill loaded:
 | Backend Eng | `backend-engineer` | `backend/` | ✅ | DeepSeek-V4 | Claude Opus* |
 | Frontend Eng | `frontend-engineer` | `frontend/` | ✅ | DeepSeek-V4 | — |
 | Mobile Eng | `mobile-engineer` | `mobile/` | ✅ | DeepSeek-V4 | — |
+| AI Engineer | `ai-engineer` | LLM layer | ✅ (llm scope) | DeepSeek-V4 | Claude Opus* |
+| Financial Analyst | `financial-analyst` | specs only | ❌ | DeepSeek-V4 | Claude Opus* |
 | Reviewer | `reviewer` | ❌ | ✅ | DeepSeek-V4 | Claude Opus* |
 | QA | `qa` | ❌ | ✅ | DeepSeek-V4 | — |
 | Security Eng | `security-engineer` | ❌ | ✅ | DeepSeek-V4 | Claude Opus* |
