@@ -162,8 +162,7 @@ consistency.
     in flight. They must be impossible to trigger accidentally.
 15. **Catalog-first.** Every component is documented as a catalog entry
     (format above) with JSON-serializable props and data-bound states —
-    A2UI-ready by construction, whether or not an agent ever composes
-    it. See `references/a2ui.md`.
+    the catalog is the single design contract for every component.
 
 ---
 
@@ -226,10 +225,9 @@ each describing what renders.
 
 ### Component catalog entry format
 
-Every component is documented as a **catalog entry** — the format is
-A2UI-ready: an agent must be able to emit a valid instance from this
-table alone, and an engineer must never have to make a design
-decision. Reference: `references/a2ui.md`.
+Every component is documented as a **catalog entry** — the single
+design contract: an engineer must be able to build the component from
+this table alone and never has to make a design decision.
 
 ```markdown
 ### Catalog: <type>
@@ -254,15 +252,14 @@ row per state with the field/value that triggers it:
 |------|------|----------|---------|--------------------------------|
 
 **Action semantics:** each interaction — what it means, what data it
-sends to the agent/backend, and its disabled/confirm variants
-(A2UI `actionResponse` maps here).
+sends to the backend, and its disabled/confirm variants.
 
 **Responsive behavior:** per-breakpoint rules (web) or touch
 adaptations (mobile).
 
 **Accessibility:** role, label, keyboard, focus, contrast. These are
-CATALOG properties — every agent-composed screen using this component
-inherits them, so they are mandatory here.
+CATALOG properties — every screen using this component inherits them,
+so they are mandatory here.
 
 **Tokens:** `--color-*`, `--space-*`, `--text-*` only. No raw values.
 ```
@@ -350,8 +347,3 @@ files, and every finding cites `file:line`. Then:
   domain-specific UX rules (e.g., financial safety for trading UIs).
 - Coordinate with the `architect` and `frontend-engineer` /
   `mobile-engineer` skills exactly as described above.
-- **Agent-generated UI (A2UI):** read `references/a2ui.md` before
-  designing any surface an agent may compose. The template rule:
-  design the catalog (components + states + tokens), not bespoke
-  screens; states must be data-bound; tokens are the only styling
-  surface; critical flows stay hand-built and out of agent surfaces.
