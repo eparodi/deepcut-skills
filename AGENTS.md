@@ -501,3 +501,14 @@ transaction.** A failing statement rolls back every earlier statement in
 the batch (the output still prints each affected row count — it's
 misleading). Run destructive statements one at a time, or use explicit
 `BEGIN`/`COMMIT` blocks.
+
+### 10.10 Config Deploy Ordering
+
+**Deploy the binary/service before adding new config keys.** Config
+parsers that reject unknown fields (Go `json.Decoder` +
+`DisallowUnknownFields`; strict pydantic/serde) crash or crash-loop a
+service when the live config contains a key the deployed binary doesn't
+define yet. Order for any config-key change: (1) deploy the new
+service, (2) verify it starts cleanly, (3) add the key to the live
+config, (4) restart. Reverse order = outage (a supervisor with
+restart-always turns it into a crash loop).
