@@ -317,3 +317,8 @@ files, and every finding cites `file:line`. Then:
   domain-specific UX rules (e.g., financial safety for trading UIs).
 - Coordinate with the `architect` and `frontend-engineer` /
   `mobile-engineer` skills exactly as described above.
+- **Agent-generated UI (A2UI):** read `references/a2ui.md` before
+  designing any surface an agent may compose. The template rule:
+  design the catalog (components + states + tokens), not bespoke
+  screens; states must be data-bound; tokens are the only styling
+  surface; critical flows stay hand-built and out of agent surfaces.
