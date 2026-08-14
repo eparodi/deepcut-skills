@@ -160,6 +160,10 @@ consistency.
 14. **Safety-critical actions** (destructive, money-moving) get: clear
     consequence copy, a confirmation step, and a disabled state while
     in flight. They must be impossible to trigger accidentally.
+15. **Catalog-first.** Every component is documented as a catalog entry
+    (format above) with JSON-serializable props and data-bound states —
+    A2UI-ready by construction, whether or not an agent ever composes
+    it. See `references/a2ui.md`.
 
 ---
 
@@ -220,18 +224,47 @@ each describing what renders.
 **UX copy:** every string — headings, buttons, errors, empties.
 ```
 
-### Component spec format
+### Component catalog entry format
+
+Every component is documented as a **catalog entry** — the format is
+A2UI-ready: an agent must be able to emit a valid instance from this
+table alone, and an engineer must never have to make a design
+decision. Reference: `references/a2ui.md`.
 
 ```markdown
-### Component: <Name>
+### Catalog: <type>
 
-**Purpose / Behavior:** ...
-**Variants:** default, compact, ...
-**States table:** Default | Loading | Empty | Error | Disabled
-**Props (from API):** name | type | required | source endpoint
-**Responsive behavior:** ...
-**Accessibility:** role, label, keyboard, focus, contrast notes
-**Tokens used:** `--color-*`, `--space-*`, `--text-*` only.
+**Purpose / Behavior:** one line each — what it does, when to use it.
+
+**Variants:** `default`, `compact`, ... (each variant is a documented
+value of a `variant` prop, never a separate type).
+
+**States (data-bound):** states are DATA, not alternate screens. One
+row per state with the field/value that triggers it:
+| State | Trigger (field/value) | Renders |
+|-------|-----------------------|---------|
+| Loading | `status: "loading"` | skeleton ... |
+| Empty   | `items: []`          | teaches the next action |
+| Error   | `error: {...}`       | plain-language + Retry |
+| Populated | `status: "ok"`     | the content |
+| Disabled | `disabled: true`     | greyed, no pointer events |
+
+**Props (JSON-serializable):**
+| Prop | Type | Required | Default | Source (API field / derivation) |
+|------|------|----------|---------|--------------------------------|
+
+**Action semantics:** each interaction — what it means, what data it
+sends to the agent/backend, and its disabled/confirm variants
+(A2UI `actionResponse` maps here).
+
+**Responsive behavior:** per-breakpoint rules (web) or touch
+adaptations (mobile).
+
+**Accessibility:** role, label, keyboard, focus, contrast. These are
+CATALOG properties — every agent-composed screen using this component
+inherits them, so they are mandatory here.
+
+**Tokens:** `--color-*`, `--space-*`, `--text-*` only. No raw values.
 ```
 
 ### Design tokens format
