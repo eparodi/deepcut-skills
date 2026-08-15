@@ -615,3 +615,14 @@ temporary dump test) and the change into files and diff them — only
 intended deltas may appear (CSRF tokens are the expected noise). Clean
 up the dump test and the worktree afterwards. An eyeball check is not
 evidence; the diff immediately exonerates or convicts the refactor.
+
+### 10.20 Model Tier Routing
+
+**Mechanical, reversible tasks run on Flash; judgment or
+hard-to-reverse tasks run on Pro.** Mechanical = applying spec'd
+edits, running builds/tests, grep/summarize, session-log and retro
+drafts, boilerplate. Pro = architecture and API contracts, security
+audits, money/risk rules, debugging after Flash exhausts its repair
+ladder, skill design (factory), learning distillation (porter). Flash
+escalates after 1 local repair + 1 re-ask, handing over findings so
+Pro never re-reads context Flash already read.
