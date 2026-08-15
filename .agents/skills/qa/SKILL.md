@@ -90,12 +90,11 @@ Use `grep` to cross-check; if a mismatch is found, flag it as a
 - If a new route is added, verify it has a `<Suspense>` boundary, an
   error boundary, and an appropriate `<meta>` title.
 
-### 5. Security quick‑check
+### 5. Security flags
 
-- Look for any new `.env.example` entries; ensure they have safe
-  defaults.
-- Scan for `fmt.Sprintf` with user-controlled input in SQL queries.
-  Flag any for manual review.
+Do NOT re-run security checks — the `security-engineer` role owns them
+and runs in parallel with QA. Read its report and surface any
+critical/high findings that block QA sign-off.
 
 ---
 

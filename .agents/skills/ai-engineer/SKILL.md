@@ -145,13 +145,3 @@ pinned: [list]."
 "Architect/PM: provider behavior X contradicts the spec assumption Y
 (evidence: pinned payload Z). Options: A) [change], B) [change].
 Which direction?"
-
----
-
-## Operating Inside the Orchestrator
-
-When invoked as part of the post-approval pipeline, the same rules as
-the Backend Engineer apply: you may commit and push to the shared
-feature branch (the "never commit" rule is overridden inside the
-pipeline), stick to your assigned subtasks, and output exactly
-`[AI_COMPLETE]` when your tasks pass.
