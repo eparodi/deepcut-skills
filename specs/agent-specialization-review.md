@@ -19,6 +19,17 @@ declarations). Roster: `skills-test/AGENT_INDEX.md`.
    migrations 000001/000002 lack `IF NOT EXISTS` idempotency, no down
    migrations exist, all 4 postgres adapters correctly check
    `rows.Err()`.
+3. **E1 resolved: `mobile/` IS planned for deepcut-live** —
+   `mobile-engineer` + `expo` stay in that repo; the current absence
+   of the directory is a staging state, not a mistake.
+4. **Migration findings (db-analyst test task): no fix** — user
+   decision: leave 000001/000002 idempotency and the missing down
+   migrations as-is for now.
+5. **skills-test `.gitignore` for `specs/memories/` is intentional** —
+   skills-test holds the RESULT of learnings (AGENTS.md §10); it does
+   not generate session learnings, so its memories stay local.
+   Per-repo repos that DO generate learnings (bot) keep committing
+   theirs.
 
 ## Universal finding
 
@@ -67,11 +78,11 @@ pattern in session logs/retros). Candidates, strongest first:
 
 ### E. Open decisions
 
-| # | Question |
-|---|---|
-| E1 | `mobile-engineer` + `expo` exist in deepcut-live but `mobile/` does NOT exist there. Remove from deepcut-live, or is mobile/ planned? |
-| E2 | bot `pm`/`spec-driven` never route to `ux-designer` even though the bot repo has one now — update the bot's spec-driven Phase 2 to include UX? |
-| E3 | Splits C1–C5: which ones do you want spec'd? (Each becomes a small spec + skill-factory run; evidence for C1/C2 is already in session logs/§10, C3–C5 are structural only.) |
+| # | Question | Status |
+|---|---|---|
+| E1 | `mobile-engineer` + `expo` in deepcut-live without `mobile/` | ✅ Resolved: `mobile/` is planned — keep the skills |
+| E2 | bot `pm`/`spec-driven` never route to `ux-designer` (bot has one) | Open |
+| E3 | Splits C1–C5: which to spec now vs after the pilot | Open (recommended: wait for pilot data, 2026-08-16 start) |
 
 ## Recommended order
 
