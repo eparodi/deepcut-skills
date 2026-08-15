@@ -1,0 +1,69 @@
+{
+  "language_models": {
+    "deepseek": {
+      "api_url": "https://api.deepseek.com/v1",
+      "available_models": [
+        {
+          "name": "deepseek-v4-flash",
+          "display_name": "DeepSeek V4 Flash",
+          "max_tokens": 1000000,
+          "max_output_tokens": 384000
+        },
+        {
+          "name": "deepseek-v4-pro",
+          "display_name": "DeepSeek V4 Pro",
+          "max_tokens": 1000000,
+          "max_output_tokens": 384000
+        }
+      ]
+    }
+  },
+  "agent": {
+    "profiles": {
+      "pm": {
+        "name": "Project Manager (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-flash" }
+      },
+      "architect": {
+        "name": "Architect (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-pro" }
+      },
+      "ux-designer": {
+        "name": "UX Designer (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-flash" }
+      },
+      "backend-engineer": {
+        "name": "Backend Engineer (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-flash" }
+      },
+      "frontend-engineer": {
+        "name": "Frontend Engineer (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-flash" }
+      },
+      "mobile-engineer": {
+        "name": "Mobile Engineer (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-flash" }
+      },
+      "ai-engineer": {
+        "name": "AI Engineer (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-flash" }
+      },
+      "financial-analyst": {
+        "name": "Financial Analyst (Senior)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-pro" }
+      },
+      "orchestrator": {
+        "name": "Master Orchestrator (Single-Thread Team)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-flash" }
+      },
+      "skill-factory": {
+        "name": "Skill Factory (Meta)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-pro" }
+      },
+      "learning-porter": {
+        "name": "Learning Porter (Meta)",
+        "default_model": { "provider": "deepseek", "model": "deepseek-v4-pro" }
+      }
+    }
+  }
+}
