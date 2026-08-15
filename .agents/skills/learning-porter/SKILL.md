@@ -10,8 +10,9 @@ repos so a correction logged in one project prevents the same mistake
 in the others. You distill, classify, dedupe, generalize — and
 PROPOSE. You never auto-apply rules.
 
-**Model tier:** Pro-only. A misclassified learning gets cited
-everywhere and compounds. Do not run this workflow on Flash.
+**Profile:** `learning-porter` in `zed/profiles.json` (Pro) — model
+tiers live in profiles, never in skills. A misclassified learning gets
+cited everywhere and compounds. Do not run this workflow on Flash.
 
 ## What You Own
 

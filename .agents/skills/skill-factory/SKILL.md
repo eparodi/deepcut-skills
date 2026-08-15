@@ -9,9 +9,10 @@ You are the **skill factory**: the only role allowed to draft new agent
 skills for the noir-hq repos. You turn recurring evidence into narrow,
 testable skills — never into speculative ones.
 
-**Model tier:** Pro-only. Skill design is high-leverage: a bad rule
-poisons every future thread that loads it. Do not run this workflow on
-Flash.
+**Model tier:** defined in `zed/profiles.json` — skills never declare
+tiers. This role's profile is `skill-factory` (Pro). Skill design is
+high-leverage: a bad rule poisons every future thread that loads it.
+Do not run this workflow on Flash.
 
 ## What You Own
 
@@ -49,7 +50,29 @@ Grep the existing skill roster (`skills-test/.agents/skills/`,
 for coverage of the pattern. If already covered → propose an extension
 to the existing skill as a reviewable diff. Do not create a duplicate.
 
-### 3. Draft
+### 3. Pair with a profile (MUST pass)
+
+The model tier lives in the repo's `zed/profiles.json` — NEVER in the
+SKILL.md. Add (or update) a profile entry for the skill:
+
+```json
+"<skill-name>": {
+  "display_name": "<Name>",
+  "skills": ["<skill-name>"],
+  "tools": { "...": true },
+  "model": {
+    "default": "deepseek-v4-flash | deepseek-v4-pro",
+    "heavy": "deepseek-v4-pro | \"\"",
+    "reasoning": "<why this tier>"
+  }
+}
+```
+
+Tier choice follows the routing policy (skills-test AGENTS.md §10.20):
+mechanical/reversible → Flash default + Pro escalation; judgment /
+hard-to-reverse (design, money, security, distillation) → Pro.
+
+### 4. Draft
 
 Create `skills-test/.agents/skills/<kebab-case-name>/SKILL.md` using
 the template below. The name must not collide with the roster. The
@@ -64,7 +87,8 @@ description: <one line — quote if it contains ": ">
 
 # <Name>
 
-**Model tier:** Flash-only | Escalates-to-Pro | Pro-only
+**Profile:** <profile id in zed/profiles.json> — model tier lives
+in the profile, never here.
 
 ## What You Own
 ...
@@ -85,34 +109,36 @@ description: <one line — quote if it contains ": ">
 ...
 ```
 
-### 4. Validate
+### 5. Validate
 
 Run from skills-test:
 
 ```bash
 ruby -ryaml -e 'ARGV.each { |f| YAML.load_file(f); puts "#{f}: OK" }' .agents/skills/<name>/SKILL.md
+python3 -m json.tool zed/profiles.json
 ```
 
-Re-parse until OK. Never trust a visual check.
+Both must pass. Never trust a visual check.
 
-### 5. Test task
+### 6. Test task
 
 Execute the skill's declared Test Task in a throwaway thread. It must
 pass before adoption. If it fails, fix the skill or decline.
 
-### 6. Handoff
+### 7. Handoff
 
-Present: the diff, the validation output, the test-task result, and
-the evidence that justified creation. A human approves before the
-skill is adopted. Delete throwaway test scaffolding afterwards.
+Present: the diff (skill + profile entry), the validation output, the
+test-task result, and the evidence that justified creation. A human
+approves before the skill is adopted. Delete throwaway test
+scaffolding afterwards.
 
 ## Guardrails
 
 - Never draft without qualifying evidence (step 1).
 - Never skip the dedupe check (step 2).
 - Never edit AGENTS.md or existing skills without explicit approval.
-- New skills must declare a model tier and keep a stable prompt prefix
-  (system/rules first) to protect KV-cache hits.
+- New skills pair with a profile entry in `zed/profiles.json` — model
+  tiers live ONLY there, never in the SKILL.md.
 - Every skill costs context tokens in every thread that loads it —
   when in doubt, propose an extension, not a new skill.
 
@@ -122,10 +148,12 @@ skill is adopted. Delete throwaway test scaffolding afterwards.
    logs and retros; run the evidence gate; confirm refusal + report.
 2. Evidence path: pick a REAL recurring pattern from the session logs
    (a correction that appears in ≥2 sessions); produce a draft
-   SKILL.md; confirm it YAML-parses and declares a model tier.
+   SKILL.md + a paired profile entry; confirm the skill YAML-parses
+   and the profile JSON-parses with a tier set.
 
 ## Handoff
 
-"Skill factory complete. Draft: <path>. Evidence: <events>. Dedupe:
-<checked roster, result>. Validation: <ruby output>. Test task:
-<result>. Awaiting your approval before adoption."
+"Skill factory complete. Draft: <path>. Profile: <profile id,
+json-tool-validated>. Evidence: <events>. Dedupe: <checked roster,
+result>. Validation: <ruby + json output>. Test task: <result>.
+Awaiting your approval before adoption."
