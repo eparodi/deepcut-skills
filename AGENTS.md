@@ -394,9 +394,13 @@ At the end of a feature or session:
 
 ---
 
-## Section 10 — Session Learnings (from retros)
+## Section 10 — Shared Session Learnings (from retros)
 
-Rules added from retro analysis of corrections made during sessions.
+Generic rules from retro analysis of corrections made across the
+noir-hq repos. They apply to EVERY repo (code style, tool discipline,
+UI, ops, payload verification, deploy ordering) — project-specific
+learnings stay in each repo's own AGENTS.md. Cite them as
+"skills-test AGENTS.md §10: <rule name>".
 
 ### 10.1 Docker Path Verification
 
@@ -417,6 +421,10 @@ have its own defaults that take precedence.
 side effects.** Example: SRS callbacks (`on_publish`) and the poller both
 create streams. If a side effect (thumbnail capture, notification) is
 only added to one path, it silently fails when the other path is used.
+Same trap in the trading bot: trades open from live execution, dry-run,
+AND startup reconciliation — if a side effect (learning, stats update,
+exit-rule capture) is added to only one path, it silently fails on the
+others.
 
 ```bash
 # Find all call sites before adding a side effect
@@ -443,9 +451,10 @@ error), the browser shows a broken image icon. Always add:
 ### 10.4 Third-Party Library Version Checking
 
 **Always verify the exact API of the installed version, not the latest
-docs.** Breaking changes between versions (e.g., non-blocking `Start()`
-vs blocking, explicit migration requirement) can cause silent failures.
-Before using a library method:
+docs.** Breaking changes between versions can cause silent failures:
+non-blocking vs blocking `Start()`, an explicit migration requirement,
+`Tx.NextSequence` vs `Bucket.NextSequence` (bbolt), API drift in
+`math/rand/v2`. Before using a library method:
 
 ```bash
 # Check the actual source of the installed version
@@ -477,9 +486,12 @@ before assuming your mounted config takes effect.
 **Verify payloads and feature availability against the ACTUAL version of
 the external service.** SRS 5 sends `client_id` as a string in
 `http_hooks` callbacks (older versions sent numbers) and removed LL-HLS
-config directives entirely. Specs or docs written for a different version
-cause silent failures. Capture one real payload and pin it in a
-table-driven test.
+config directives entirely; Binance klines and DeepSeek chat responses
+also drift between API versions and model tiers (a model emitting a
+chain-of-thought into `reasoning_content` changes the max_tokens math).
+Specs or docs written for a different version cause silent failures.
+Capture one real payload and pin it in a table-driven test before
+trusting docs.
 
 ### 10.8 Subprocess Hygiene (media pipelines)
 
@@ -511,4 +523,95 @@ service when the live config contains a key the deployed binary doesn't
 define yet. Order for any config-key change: (1) deploy the new
 service, (2) verify it starts cleanly, (3) add the key to the live
 config, (4) restart. Reverse order = outage (a supervisor with
-restart-always turns it into a crash loop).
+restart-always turns it into a crash loop). Same rule bit the trading
+bot's Pi deploy: `deploy-pi.sh` ships the binary first and leaves
+config.json untouched — verify "bot started", then add the field and
+restart.
+
+### 10.11 Claimed Edits Must Be Verified
+
+**Never report an edit as applied without the tool result proving
+it.** A previous session stated two spec edits were "updated" when no
+edit tool had run — the file was unchanged and the correction was only
+caught by re-reading. After claiming an edit, re-read the affected
+section or trust ONLY the tool's success result, never memory.
+
+### 10.12 SKILL.md Frontmatter Must Be YAML-Parsed, Not Eyeballed
+
+**Unquoted `description:` values containing `: ` (colon+space) are
+invalid YAML** — `deepcut-binance-bot: the provider...` breaks the
+frontmatter at line 3 (`mapping values are not allowed`), and the
+skill fails to load. After writing any `SKILL.md`:
+
+```bash
+ruby -ryaml -e 'ARGV.each { |f| YAML.load_file(f); puts "#{f}: OK" }' .agents/skills/*/SKILL.md
+```
+
+Quote any description containing `: ` with double quotes, then re-parse.
+Do not trust a visual check — a YAML parser is the only verification.
+
+### 10.13 Append-At-End Edit Anchoring
+
+**Appending code to an existing file must anchor on the file's actual
+LAST unique line (read the tail first).** Generic closing-brace
+patterns (`}\n\t})\n}`) match many functions — the edit tool inserts
+mid-file and breaks brace structure. Symmetric old/new anchors can
+silently delete the anchored lines; after every multi-edit batch,
+re-read the affected regions (matches 10.11).
+
+### 10.14 Comment-Only Contracts
+
+**An input-order contract that lives only in a doc comment WILL be
+violated by a caller or a test.** When ordering matters (newest-first
+input, deterministic output), enforce it INSIDE the function (sort,
+stable) — robustness belongs in the function, not in the comment.
+Also: fixtures writing to age-pruned stores must use `time.Now()`-based
+timestamps — epoch-1970 rows are correctly pruned and fail tests
+mysteriously.
+
+### 10.15 Float Display Formatting
+
+**Trimming trailing zeros after `strconv.FormatFloat` must only touch
+fractional digits.** `strings.TrimRight(s, "0")` on a value formatted
+with `prec=0` (no decimal point) eats integer zeros: 100 → "1", 1e8 →
+"1M". Guard the trim with `strings.Contains(s, ".")`, or always format
+with `prec > 0` so a decimal point exists. Pin regression rows for
+round powers (100, 1e8) in the formatter's table tests.
+
+### 10.16 Pinned Copy and Ban Strings in Page Tests
+
+**Unescape `html/template` entities before comparing pinned copy** in
+rendered HTML (`bot&#39;s` ≠ `bot's` — still a recurring trap). **Ban
+test strings must target rendered VALUES, never labels or links** —
+a term that legitimately appears as a glossary link is not the thing
+the ban asserts; the value is what must be absent. **Spec-pinned copy
+renders verbatim on every profile/variant** unless the spec scopes it
+(the bot's /backtest empty-state run instruction).
+
+### 10.17 Test Configs Must Survive the Validation the Code Runs
+
+**When the code under test validates a candidate config, the test-env
+config must be validation-clean** — invalid floors or a zero config
+block break tests far from their cause. Keep secondary test-only
+weighting in a SEPARATE map so the validated config stays valid
+without changing the behavior under test.
+
+### 10.18 Shared Lists Need Per-Consumer Pinning
+
+**When one list feeds two different render consumers, filter it per
+consumer — never pass a zero-value struct into a template define.** A
+zero-value struct passed to a define renders REAL, visible DOM (empty
+label + empty input), not nothing. Pin each consumer's rendered output
+with a render test, including what must be ABSENT (the bot's phantom
+empty `num-input` under `<label for="symbols">` is the cautionary tale
+— `riskFields` fed both the confirm page's rows and the settings form's
+order; the form never filtered `symbols`).
+
+### 10.19 Behavior-Neutral Refactors Ship with a Rendered-Output Diff
+
+**When a refactor claims to change nothing visually, prove it with a
+rendered-output diff.** Render the pre-change commit (worktree + a
+temporary dump test) and the change into files and diff them — only
+intended deltas may appear (CSRF tokens are the expected noise). Clean
+up the dump test and the worktree afterwards. An eyeball check is not
+evidence; the diff immediately exonerates or convicts the refactor.
