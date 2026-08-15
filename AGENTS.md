@@ -626,3 +626,25 @@ audits, money/risk rules, debugging after Flash exhausts its repair
 ladder, skill design (factory), learning distillation (porter). Flash
 escalates after 1 local repair + 1 re-ask, handing over findings so
 Pro never re-reads context Flash already read.
+
+### 10.21 Pre-Existing Claims Are Proven Against the Merge-Base
+
+**"Fails without my changes" is only proven by testing the merge-base
+commit — never a stash of uncommitted work.** A stash check leaves
+EARLIER COMMITTED changes (from the same workstream) active, so the
+failure still contains your bug and gets misattributed as
+pre-existing (2026-08-15: the strict pricing validation was already
+committed when the stash test "proved" two failures pre-existing —
+they were mine). Use `git stash` only for uncommitted changes; for
+committed ones, test `git merge-base main HEAD` or the parent commit.
+
+### 10.22 Insert-Before Edit Anchoring
+
+**When inserting new code before an existing block, never anchor on
+the block's first line alone.** Replacing `func X(...) {` with the new
+code + `func X(...) {` silently deletes X's opening body lines (three
+recurrences 2026-08-15, each repaired by re-reading). The safe
+pattern: old_text = the block's signature PLUS its first body lines;
+new_text = new code + that same prefix verbatim. Same family as 10.13
+(append-at-end) — re-read the affected region after the edit either
+way (10.11).
