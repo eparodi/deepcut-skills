@@ -187,6 +187,63 @@
         "reasoning": "One agent simulates PLANNER/CODER/REVIEWER/DEBUGGER and loops until PLAN.md is fully checked off. Full read/write/terminal — needs to work across the whole repo with no write scope restrictions. Escalate to Pro if the loop stalls on a hard-to-reverse design decision."
       }
     },
+    "reviewer": {
+      "display_name": "Code Reviewer (Senior)",
+      "skills": ["reviewer"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": false,
+        "edit_file": false,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek-v4-flash",
+        "heavy": "deepseek-v4-pro",
+        "reasoning": "Read-only code review: needs grep/read to inspect, terminal to run build/tests. Never writes code. Flash for review reports; escalate to Pro for subtle correctness issues."
+      }
+    },
+    "qa": {
+      "display_name": "QA Engineer (Senior)",
+      "skills": ["qa"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": false,
+        "edit_file": false,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek-v4-flash",
+        "heavy": "",
+        "reasoning": "QA runs test suites and verifies spec contracts. Terminal enabled for build/test commands; no writes."
+      }
+    },
+    "security-engineer": {
+      "display_name": "Security Engineer (Senior)",
+      "skills": ["security-engineer"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": false,
+        "edit_file": false,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek-v4-pro",
+        "heavy": "",
+        "reasoning": "Security audits and local penetration testing. Terminal enabled for scanners and static analysis; no writes. Pro by default: audits are judgment-heavy and hard to reverse."
+      }
+    },
     "skill-factory": {
       "display_name": "Skill Factory (Meta)",
       "skills": ["skill-factory"],
@@ -224,8 +281,27 @@
         "heavy": "",
         "reasoning": "Distills session learnings into rules and moves them across repos: generic rules to the shared pool (skills-test AGENTS.md §10), repo-specific rules to that repo's §10, and paste-ready export files for projects outside noir-hq. Pro by default: a misclassified learning gets cited everywhere and compounds."
       }
+    },
+    "db-analyst": {
+      "display_name": "DB Analyst (Senior)",
+      "skills": ["db-analyst", "go-chi"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek-v4-pro",
+        "heavy": "",
+        "reasoning": "Owns Postgres migration mechanics, the store/query layer, data integrity, and test-DB strategy. Reviews the Architect's data model for mechanical safety, never designs tables. Pro by default: migrations and destructive schema changes are hard to reverse."
+      }
     }
   },
-  "version": "1.4.0",
+  "version": "1.5.0",
   "last_updated": "2026-08-15"
 }

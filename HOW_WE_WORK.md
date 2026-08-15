@@ -14,6 +14,7 @@ role skill loaded:
 | Frontend Eng | `frontend-engineer` | `frontend/` | ✅ | Flash | — |
 | Mobile Eng | `mobile-engineer` | `mobile/` | ✅ | Flash | — |
 | AI Engineer | `ai-engineer` | LLM layer | ✅ (llm scope) | Flash | Pro |
+| DB Analyst | `db-analyst` | `backend/db` + stores | ✅ | Pro | — |
 | Financial Analyst | `financial-analyst` | specs only | ❌ | Pro | — |
 | Reviewer | `reviewer` | ❌ | ✅ | Flash | Pro |
 | QA | `qa` | ❌ | ✅ | Flash | — |

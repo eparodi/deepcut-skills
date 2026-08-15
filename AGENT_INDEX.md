@@ -8,6 +8,9 @@
 > meta-roles. Per-repo copies exist for workflow convenience and DO
 > drift — see "Duplication & Drift" below. The learning-porter owns
 > keeping them in sync (proposals only).
+>
+> **Model tiers live ONLY in `zed/profiles.json`** — SKILL.md files
+> never declare tiers.
 
 ## Role agents (skills that define an agent role)
 
@@ -22,6 +25,7 @@ Tiers: F = Flash default, P = Pro default; "heavy" = escalation tier.
 | `frontend-engineer` | Next.js App Router implementation in `frontend/` | F / P | full + terminal | skills-test, deepcut-live |
 | `mobile-engineer` | Expo/React Native in `mobile/` | F / P | full + terminal | skills-test, deepcut-live |
 | `ai-engineer` | LLM layer: provider client, malformed-response ladder, retries/breaker, token telemetry, cost budget | F / P | full + terminal + fetch | skills-test, deepcut-binance-bot |
+| `db-analyst` | Postgres migrations, store/query layer, data integrity, test-DB strategy | P / — | full + terminal | skills-test, deepcut-live |
 | `financial-analyst` | Trading money: risk rules, sizing, capital, PnL/fees, breaker semantics | P / — | read/write + fetch, no terminal | skills-test, deepcut-binance-bot |
 | `bot-engineer` | All Go implementation in the bot repo | F / P | full + terminal | deepcut-binance-bot |
 | `ui-engineer` | Bot dashboard: Go html/template + folder-per-component CSS/JS | F / P | full + terminal | deepcut-binance-bot |
