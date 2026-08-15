@@ -615,3 +615,7 @@ CI gates apply; user merges).
   `~/.zed/settings.json` or `~/Library/Application Support/Zed/settings.json`;
   the user applies `zed/zed-settings-snippet.json` (and the
   `DEEPSEEK_API_KEY` via Zed's UI, which stores keys in the keychain).
+- **Zed wiring VERIFIED 2026-08-15:** both `deepseek-v4-flash` and
+  `deepseek-v4-pro` appear in the agent model picker (user-confirmed);
+  the key lives in the keychain; no settings.json changes were needed.
+  The snippet remains reference material only for this machine.
