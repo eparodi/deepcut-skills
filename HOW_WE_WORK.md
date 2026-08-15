@@ -2,32 +2,34 @@
 
 ## The Setup
 
-You run six agent threads simultaneously in Zed, each with a different
+You run role agent threads simultaneously in Zed, each with a different
 role skill loaded:
 
-| Thread | Skill | Can Write? | Can Terminal? | Model (fast) | Model (heavy) |
+| Thread | Skill | Can Write? | Can Terminal? | Model (default) | Model (heavy) |
 |--------|-------|-----------|--------------|-------------|-------------|
-| PM | `pm` | specs only | ❌ | DeepSeek-V4 | — |
-| Architect | `architect` | specs only | ❌ | DeepSeek-V4 | Claude Opus* |
-| UX Designer | `ux-designer` | specs only | ❌ | DeepSeek-V4 | Claude Opus* |
-| Backend Eng | `backend-engineer` | `backend/` | ✅ | DeepSeek-V4 | Claude Opus* |
-| Frontend Eng | `frontend-engineer` | `frontend/` | ✅ | DeepSeek-V4 | — |
-| Mobile Eng | `mobile-engineer` | `mobile/` | ✅ | DeepSeek-V4 | — |
-| AI Engineer | `ai-engineer` | LLM layer | ✅ (llm scope) | DeepSeek-V4 | Claude Opus* |
-| Financial Analyst | `financial-analyst` | specs only | ❌ | DeepSeek-V4 | Claude Opus* |
-| Reviewer | `reviewer` | ❌ | ✅ | DeepSeek-V4 | Claude Opus* |
-| QA | `qa` | ❌ | ✅ | DeepSeek-V4 | — |
-| Security Eng | `security-engineer` | ❌ | ✅ | DeepSeek-V4 | Claude Opus* |
+| PM | `pm` | specs only | ❌ | Flash | Pro |
+| Architect | `architect` | specs only | ❌ | Pro | — |
+| UX Designer | `ux-designer` | specs only | ❌ | Flash | Pro |
+| Backend Eng | `backend-engineer` | `backend/` | ✅ | Flash | Pro |
+| Frontend Eng | `frontend-engineer` | `frontend/` | ✅ | Flash | — |
+| Mobile Eng | `mobile-engineer` | `mobile/` | ✅ | Flash | — |
+| AI Engineer | `ai-engineer` | LLM layer | ✅ (llm scope) | Flash | Pro |
+| Financial Analyst | `financial-analyst` | specs only | ❌ | Pro | — |
+| Reviewer | `reviewer` | ❌ | ✅ | Flash | Pro |
+| QA | `qa` | ❌ | ✅ | Flash | — |
+| Security Eng | `security-engineer` | ❌ | ✅ | Pro | — |
+| Skill Factory | `skill-factory` | skills only | ✅ | Pro | — |
+| Learning Porter | `learning-porter` | proposals only | ❌ | Pro | — |
 
-*Use stronger model for architecture decisions, complex type design,
-cross-cutting refactors, and security audits. DeepSeek is fine for
-routine implementation.
+Flash = `deepseek-v4-flash`, Pro = `deepseek-v4-pro`. Routing policy
+and escalation ladder: see "Model Tier Routing" below (canonical
+policy, also pinned in skills-test AGENTS.md §10.20).
 
 ---
 
 ## Single-Thread Orchestrator Mode (Alternative Setup)
 
-Running nine threads is the full-team ceremony. When you don't need it —
+Running the full multi-thread ceremony is expensive. When you don't need it —
 the spec is already approved, or the task is a well-scoped bugfix — you
 can run the whole build loop in **one** thread:
 
@@ -57,7 +59,7 @@ fix) and is forbidden from asking "Should I...?" — it works until every
 | New feature, requirements/design not yet reviewed by a human | Multi-thread `spec-driven` flow (gates matter) |
 | Spec approved, just build it | Orchestrator (one thread) |
 | Bugfix, refactor, or small chore with clear scope | Orchestrator (one thread) |
-| Cross-cutting architecture decisions or security-sensitive work | Multi-thread flow + Claude Opus, or at least set `heavy: claude-opus` on the orchestrator profile |
+| Cross-cutting architecture decisions or security-sensitive work | Multi-thread flow + Pro, or at least set `heavy` to Pro on the orchestrator profile |
 
 Trade-off: the orchestrator's REVIEWER is the same model that wrote the
 code, so it is a weaker check than a separate reviewer thread. Compensate
@@ -239,19 +241,59 @@ If any role encounters ambiguity in the spec:
 
 ---
 
-## Model Selection as a Cost Lever
+## Model Tier Routing (canonical policy)
 
-| Task Complexity | Model | Cost |
-|-----------------|-------|------|
-| Routine CRUD, wiring, boilerplate | DeepSeek-V4 | Low |
-| Architecture decisions, type design, complex logic | Claude Opus / GPT-4o | Medium |
-| Spec writing, acceptance criteria | DeepSeek-V4 | Low |
-| UI design, design system work | DeepSeek-V4 / Claude Opus | Low/Medium |
-| Cross-cutting refactors, security audits | Claude Opus | Medium |
+All LLM work routes through two DeepSeek tiers:
 
-Rule of thumb: use DeepSeek for 80% of work. Escalate to a stronger
-model when DeepSeek gets stuck, hallucinates, or when the decision is
-hard to reverse.
+- **Flash** = `deepseek-v4-flash` — the default for routine work
+- **Pro** = `deepseek-v4-pro` — reserved for judgment-heavy work
+  (~3× the price of Flash)
+
+| Task class | Tier | Examples | Escalates? |
+|---|---|---|---|
+| Mechanical file ops | Flash | apply spec'd edits, run build/test/vet, grep + summarize, commit hygiene, boilerplate | Yes |
+| Research & verification | Flash | grep for a pattern, capture a provider payload, report findings | Yes |
+| Drafts with low blast radius | Flash | session-log updates, retro drafts, pilot tracker updates | Yes |
+| Spec'd implementation | Flash | engineer tasks with approved spec + test targets (TDD loop) | Yes |
+| Architecture & contracts | Pro | API contracts, data models, technology choices | — |
+| Security & money | Pro | security audits, risk rules, sizing, breaker semantics | — |
+| Debugging after Flash ladder | Pro | repair + re-ask exhausted | — |
+| Skill design (factory) | Pro | high-leverage rule design | — |
+| Learning distillation (porter) | Pro | misclassification compounds | — |
+| Requirements & design phases | Pro | spec gates everything downstream | — |
+
+Rule of thumb: Flash for ~80% of work; escalate to Pro when Flash gets
+stuck, hallucinates, or the decision is hard to reverse. The policy is
+also pinned in skills-test AGENTS.md §10.20.
+
+### Escalation ladder
+
+1. Flash attempt fails (build error, test failure, wrong output).
+2. **Local repair** (no API call): fix the obvious defect, retry on
+   Flash.
+3. **One-shot re-ask** on Flash: compact correction prompt.
+4. **Escalate to Pro** with the handoff block below. Pro may NOT
+   re-read files listed in the handoff unless a cited excerpt is
+   insufficient.
+5. Record the escalation (cause, tier) in the pilot tracker.
+
+```markdown
+## ESCALATION HANDOFF
+- Task: <one line>
+- Spec/context: <paths>
+- What was tried: <bullets>
+- Findings (evidence): <excerpts, outputs>
+- Files already read: <paths> — do NOT re-read unless an excerpt is insufficient
+- Tests/commands run + results: <list>
+- What remains: <bullets>
+```
+
+### Cost measurement (pilot)
+
+A 7-day pilot tracks spend against the verified DeepSeek price table
+(peak/off-peak billing, effective 2026-08-16 16:00 UTC) in
+`skills-test/specs/pilot/agent-cost-pilot.md`. Design and exit
+criteria: `skills-test/specs/agent-cost-optimization.md`.
 
 ---
 
