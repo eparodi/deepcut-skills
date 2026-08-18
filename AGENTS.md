@@ -648,3 +648,59 @@ pattern: old_text = the block's signature PLUS its first body lines;
 new_text = new code + that same prefix verbatim. Same family as 10.13
 (append-at-end) — re-read the affected region after the edit either
 way (10.11).
+
+### 10.23 Partial Edit Batches Must Be Reconciled From the Diff
+
+**A multi-hunk replace that partially lands leaves the file with MIXED
+old/new signatures — continuing without re-reading breaks the build
+silently (2026-08-18: `bundle/registry.go` kept the old
+`buildRegistry`/`buildLLMEnsemble` signatures after a batch whose last
+hunk failed to match; only the Build section had been rewritten).**
+After any edit batch where a hunk failed or was reworked, read the
+file (or `git diff`) and reconcile EVERY caller of the changed
+signature before building. Same family as 10.11/10.13/10.22 — the
+compile error is the cheap symptom; the expensive one is a
+partially-migrated file that still compiles.
+
+### 10.24 Test Configs Run the Production Config Pipeline
+
+**A config layer that synthesizes defaults or validates during a
+`Validate()`/`Load()` step MUST be exercised by test fixtures the same
+way production does.** Building directly from hand-constructed structs
+bypasses defaults synthesis (2026-08-18: bundle tests failed "at least
+one strategist is required" — the registry defaults are synthesized in
+`Validate`, which the tests skipped). `testCfg` helpers must call the
+same entry point as `main`; assert the synthesized defaults in the
+test, not by accident.
+
+### 10.25 Stateful Fakes Advance Time Per Request
+
+**Fakes that feed time-sequenced logic must advance their
+time-dependent state on every request** (2026-08-18: the bot's fake
+exchange served the SAME 62 klines every call — the snapshot TS never
+advanced, so the arena journal's `signalTS < ts` scoring could never
+fire; 2023-era timestamps were additionally age-pruned by the store's
+30-day prune the moment they were saved). Candle windows, pagination
+cursors, and "next" tokens in fakes must move forward like the real
+service; anchors belong at `time.Now()`-ish values (extends §10.14).
+
+### 10.26 Budget-Gate Tests Model the Exhaust→Veto Sequence
+
+**Budget/circuit gates check `Exceeded()` at the START of the next
+call — the call that exhausts the budget PASSES, the veto lands on the
+next call** (2026-08-18: the budget-fired-day test needed cycle 1 to
+exhaust + cycle 2 to veto). Also: test builders must wire the same
+callbacks production wires (metrics.OnTokens → budget.Add); a budget
+that never receives token counts never vetoes. Sequence tests without
+the exhaust step assert a gate that never fires.
+
+### 10.27 Probes Target Markup, Never Bare Class Names
+
+**When component stylesheets are bundled and inlined into every
+page's `<head>`, a class-name probe matches the CSS bundle regardless
+of the rendered markup — position assertions (e.g., "banner topmost")
+become meaningless** (2026-08-18: the C5-banner test matched
+`scoreboard-grid` inside the stylesheet). Assert on markup
+(`<div class="scoreboard-grid">`, `<table …>`), and unescape
+`html/template` entities before comparing pinned copy (§10.16 — `+`
+renders `&#43;`).
