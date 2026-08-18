@@ -389,7 +389,7 @@ At the end of a feature or session:
 
 ---
 
-*Last updated: 2026-08-12*
+*Last updated: 2026-08-18*
 *These rules apply to all agent threads in this project.*
 
 ---
@@ -704,3 +704,58 @@ become meaningless** (2026-08-18: the C5-banner test matched
 (`<div class="scoreboard-grid">`, `<table …>`), and unescape
 `html/template` entities before comparing pinned copy (§10.16 — `+`
 renders `&#43;`).
+
+### 10.28 bbolt Bucket Sweeps Enumerate Dynamic Buckets and Empty, Not Delete
+
+**A static bucket-name list is blind to per-key namespaced buckets.**
+`cycle_lessons:<persona>:<symbol>` / `cycle_lessons_cursor:*` buckets
+are invisible to a literal `"cycle_lessons_cursor"` entry — the
+"wipe all tracking data" sweep matched nothing for them, and a
+surviving cursor would make the reflector re-distill stale rows
+(2026-08-18, `data clean`). Sweep with `tx.ForEach` + prefix
+matching. Two more bbolt traps in the same family:
+
+- **Empty buckets, never delete them** — writers that use plain
+  `tx.Bucket(name).Put` (no `CreateBucketIfNotExists`, e.g.
+  `SaveEquityPoint`) nil-panic on a deleted bucket.
+- **Read-only opens only serve pure `View` reads** — readers that
+  lazily create buckets via `Update` + `CreateBucketIfNotExists`
+  (e.g. `Learnings`) fail with "database is in read-only mode";
+  verify the read path is View-only before using a read-only handle.
+
+### 10.29 Shared State Blobs Are Patched, Not Replaced; Backups Never Overwritten
+
+**A full-replace save of a shared aggregate silently drops the fields
+other subsystems persist.** The bbolt `state` bucket carries the
+breaker fields AND the LLM daily-budget rollover, fired-alert days,
+and the summary day (2026-08-18: `positions reconcile --apply` saved
+the raw breaker state, wiping the persisted `$2/day` LLM cost cap —
+the next restart restored an empty budget). One-off CLIs/tools persist
+what they own: **load → patch → save**. Same family: a destructive
+tool with a timestamped backup must refuse to overwrite an existing
+one — a same-day second run destroys the only pre-destruction snapshot
+(same filename collision).
+
+### 10.30 Claimed State Transitions Need a Test That Exercises Them
+
+**If a comment claims a flag clears on success, write the test that
+proves it — a transition you cannot test is a transition that cannot
+happen** (2026-08-18: the stale-flag `clearStale` claimed a
+successful close clears it, but every exit path gates on
+`exitBlocked` BEFORE `closePosition`, so it was unreachable dead
+code; the FA-approved semantics were sticky-until-restart). Either
+remove the dead code and pin the ACTUAL semantics with a test
+(restored balance → still no retries → flag persists until
+restart/reconcile), or restructure so the test passes for the right
+reason.
+
+### 10.31 At the Approval Gate, Restate the Operator's Original Vision
+
+**The operator's original intent can drift out of the reviewed
+artifact** (2026-08-18: the seconds-level real-time reaction vision
+was recognized as a mismatch only AFTER the closed-15m-candle design
+shipped — the gate had decided a derivative). At the approval gate,
+restate the operator's core ask as explicit acceptance criteria and
+record consciously-deferred variants (e.g., "real-time mode") as
+explicit non-goals or follow-ups — the gate must decide the ORIGINAL
+ask, not a derivative the discussion drifted to.
