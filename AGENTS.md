@@ -759,3 +759,53 @@ restate the operator's core ask as explicit acceptance criteria and
 record consciously-deferred variants (e.g., "real-time mode") as
 explicit non-goals or follow-ups — the gate must decide the ORIGINAL
 ask, not a derivative the discussion drifted to.
+
+### 10.32 Records of Exchange Balances Must Be Net-Of-Fee
+
+**Spot exchanges charge trading fees in the RECEIVED asset** — a
+BUY's fee comes out of the base asset, so the exchange holds
+`ExecutedQty − base commission`, not the gross fill (2026-08-20
+live-mainnet: BNB recorded 0.041000 vs held 0.04079267, 0.5057% —
+full-qty SELLs failed `-2010` and a tolerance-less phantom check
+marked the position stale, stopping exits for 14h). Two-sided rule:
+(1) persist the NET quantity derived from per-fill commissions
+(`commissionAsset` == base asset), and (2) keep the fee in PnL
+(fees = quote commissions + baseFee × fill price) — netting the qty
+without adding the fee back overstates PnL by the fee principal.
+Verify the fee currency from the fill payload, never assume it.
+
+### 10.33 One-Record Caches Undercount Multi-Record Stores
+
+**An in-memory view keyed by an entity that holds ONE record while
+the store keeps every record silently undercounts every aggregate**
+(2026-08-20: `a.positions[symbol]` kept the last buy; equity,
+exposure caps, and dashboards saw 24.93 of 131.4 USDT — the 30%
+cap was defeated and older records lost TP/SL protection until a
+restart reloaded them one at a time). When a store is per-record,
+any cache/view of it must aggregate (slices, sums) — and exits,
+valuations, and published state must consume the aggregate, not a
+sample. The DB being right while the view is wrong is still a bug
+that loses money protection.
+
+### 10.34 Claimed Facts Trace to Code or Evidence, Never Recollection
+
+**Two readings in one session:** (1) "the bot started trading
+yesterday" was off by 1.5 days — the real-money switch was proven
+from `.env` mtimes and config backups (2026-08-18 14:55, not 08-19);
+(2) a "deposit mystery" (day equity 94.46 vs total 174.56) resolved
+when the field was read in code — `DaySnapshot.Equity` is MANAGED
+equity (free USDT + tracked positions), not the total. Interpret
+snapshot/dashboard fields by their code definition, and date
+"when did X start" claims from file mtimes, config backups, or
+deploy logs. A field name is a hypothesis, not a fact.
+
+### 10.35 Fixture Formatting Precision Is Part of Pinned-Test Contracts
+
+**Pinned tests can depend on a test double's exact output rounding**
+(2026-08-20: the net-zero SL test computed its fill price from the
+fake's `%.4f` commission rounding; changing the fake to `%.8f` broke
+the exact-zero assertion). Changing fixture formatting is a contract
+change: check every pinned test that feeds on the formatted value,
+or make the precision explicit per field (e.g., 4 decimals for USDT
+commissions, 8 for base-asset fees) so the rounding intent is
+visible.
