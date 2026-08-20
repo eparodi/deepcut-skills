@@ -389,7 +389,7 @@ At the end of a feature or session:
 
 ---
 
-*Last updated: 2026-08-12*
+*Last updated: 2026-08-18*
 *These rules apply to all agent threads in this project.*
 
 ---
@@ -648,3 +648,164 @@ pattern: old_text = the block's signature PLUS its first body lines;
 new_text = new code + that same prefix verbatim. Same family as 10.13
 (append-at-end) — re-read the affected region after the edit either
 way (10.11).
+
+### 10.23 Partial Edit Batches Must Be Reconciled From the Diff
+
+**A multi-hunk replace that partially lands leaves the file with MIXED
+old/new signatures — continuing without re-reading breaks the build
+silently (2026-08-18: `bundle/registry.go` kept the old
+`buildRegistry`/`buildLLMEnsemble` signatures after a batch whose last
+hunk failed to match; only the Build section had been rewritten).**
+After any edit batch where a hunk failed or was reworked, read the
+file (or `git diff`) and reconcile EVERY caller of the changed
+signature before building. Same family as 10.11/10.13/10.22 — the
+compile error is the cheap symptom; the expensive one is a
+partially-migrated file that still compiles.
+
+### 10.24 Test Configs Run the Production Config Pipeline
+
+**A config layer that synthesizes defaults or validates during a
+`Validate()`/`Load()` step MUST be exercised by test fixtures the same
+way production does.** Building directly from hand-constructed structs
+bypasses defaults synthesis (2026-08-18: bundle tests failed "at least
+one strategist is required" — the registry defaults are synthesized in
+`Validate`, which the tests skipped). `testCfg` helpers must call the
+same entry point as `main`; assert the synthesized defaults in the
+test, not by accident.
+
+### 10.25 Stateful Fakes Advance Time Per Request
+
+**Fakes that feed time-sequenced logic must advance their
+time-dependent state on every request** (2026-08-18: the bot's fake
+exchange served the SAME 62 klines every call — the snapshot TS never
+advanced, so the arena journal's `signalTS < ts` scoring could never
+fire; 2023-era timestamps were additionally age-pruned by the store's
+30-day prune the moment they were saved). Candle windows, pagination
+cursors, and "next" tokens in fakes must move forward like the real
+service; anchors belong at `time.Now()`-ish values (extends §10.14).
+
+### 10.26 Budget-Gate Tests Model the Exhaust→Veto Sequence
+
+**Budget/circuit gates check `Exceeded()` at the START of the next
+call — the call that exhausts the budget PASSES, the veto lands on the
+next call** (2026-08-18: the budget-fired-day test needed cycle 1 to
+exhaust + cycle 2 to veto). Also: test builders must wire the same
+callbacks production wires (metrics.OnTokens → budget.Add); a budget
+that never receives token counts never vetoes. Sequence tests without
+the exhaust step assert a gate that never fires.
+
+### 10.27 Probes Target Markup, Never Bare Class Names
+
+**When component stylesheets are bundled and inlined into every
+page's `<head>`, a class-name probe matches the CSS bundle regardless
+of the rendered markup — position assertions (e.g., "banner topmost")
+become meaningless** (2026-08-18: the C5-banner test matched
+`scoreboard-grid` inside the stylesheet). Assert on markup
+(`<div class="scoreboard-grid">`, `<table …>`), and unescape
+`html/template` entities before comparing pinned copy (§10.16 — `+`
+renders `&#43;`).
+
+### 10.28 bbolt Bucket Sweeps Enumerate Dynamic Buckets and Empty, Not Delete
+
+**A static bucket-name list is blind to per-key namespaced buckets.**
+`cycle_lessons:<persona>:<symbol>` / `cycle_lessons_cursor:*` buckets
+are invisible to a literal `"cycle_lessons_cursor"` entry — the
+"wipe all tracking data" sweep matched nothing for them, and a
+surviving cursor would make the reflector re-distill stale rows
+(2026-08-18, `data clean`). Sweep with `tx.ForEach` + prefix
+matching. Two more bbolt traps in the same family:
+
+- **Empty buckets, never delete them** — writers that use plain
+  `tx.Bucket(name).Put` (no `CreateBucketIfNotExists`, e.g.
+  `SaveEquityPoint`) nil-panic on a deleted bucket.
+- **Read-only opens only serve pure `View` reads** — readers that
+  lazily create buckets via `Update` + `CreateBucketIfNotExists`
+  (e.g. `Learnings`) fail with "database is in read-only mode";
+  verify the read path is View-only before using a read-only handle.
+
+### 10.29 Shared State Blobs Are Patched, Not Replaced; Backups Never Overwritten
+
+**A full-replace save of a shared aggregate silently drops the fields
+other subsystems persist.** The bbolt `state` bucket carries the
+breaker fields AND the LLM daily-budget rollover, fired-alert days,
+and the summary day (2026-08-18: `positions reconcile --apply` saved
+the raw breaker state, wiping the persisted `$2/day` LLM cost cap —
+the next restart restored an empty budget). One-off CLIs/tools persist
+what they own: **load → patch → save**. Same family: a destructive
+tool with a timestamped backup must refuse to overwrite an existing
+one — a same-day second run destroys the only pre-destruction snapshot
+(same filename collision).
+
+### 10.30 Claimed State Transitions Need a Test That Exercises Them
+
+**If a comment claims a flag clears on success, write the test that
+proves it — a transition you cannot test is a transition that cannot
+happen** (2026-08-18: the stale-flag `clearStale` claimed a
+successful close clears it, but every exit path gates on
+`exitBlocked` BEFORE `closePosition`, so it was unreachable dead
+code; the FA-approved semantics were sticky-until-restart). Either
+remove the dead code and pin the ACTUAL semantics with a test
+(restored balance → still no retries → flag persists until
+restart/reconcile), or restructure so the test passes for the right
+reason.
+
+### 10.31 At the Approval Gate, Restate the Operator's Original Vision
+
+**The operator's original intent can drift out of the reviewed
+artifact** (2026-08-18: the seconds-level real-time reaction vision
+was recognized as a mismatch only AFTER the closed-15m-candle design
+shipped — the gate had decided a derivative). At the approval gate,
+restate the operator's core ask as explicit acceptance criteria and
+record consciously-deferred variants (e.g., "real-time mode") as
+explicit non-goals or follow-ups — the gate must decide the ORIGINAL
+ask, not a derivative the discussion drifted to.
+
+### 10.32 Records of Exchange Balances Must Be Net-Of-Fee
+
+**Spot exchanges charge trading fees in the RECEIVED asset** — a
+BUY's fee comes out of the base asset, so the exchange holds
+`ExecutedQty − base commission`, not the gross fill (2026-08-20
+live-mainnet: BNB recorded 0.041000 vs held 0.04079267, 0.5057% —
+full-qty SELLs failed `-2010` and a tolerance-less phantom check
+marked the position stale, stopping exits for 14h). Two-sided rule:
+(1) persist the NET quantity derived from per-fill commissions
+(`commissionAsset` == base asset), and (2) keep the fee in PnL
+(fees = quote commissions + baseFee × fill price) — netting the qty
+without adding the fee back overstates PnL by the fee principal.
+Verify the fee currency from the fill payload, never assume it.
+
+### 10.33 One-Record Caches Undercount Multi-Record Stores
+
+**An in-memory view keyed by an entity that holds ONE record while
+the store keeps every record silently undercounts every aggregate**
+(2026-08-20: `a.positions[symbol]` kept the last buy; equity,
+exposure caps, and dashboards saw 24.93 of 131.4 USDT — the 30%
+cap was defeated and older records lost TP/SL protection until a
+restart reloaded them one at a time). When a store is per-record,
+any cache/view of it must aggregate (slices, sums) — and exits,
+valuations, and published state must consume the aggregate, not a
+sample. The DB being right while the view is wrong is still a bug
+that loses money protection.
+
+### 10.34 Claimed Facts Trace to Code or Evidence, Never Recollection
+
+**Two readings in one session:** (1) "the bot started trading
+yesterday" was off by 1.5 days — the real-money switch was proven
+from `.env` mtimes and config backups (2026-08-18 14:55, not 08-19);
+(2) a "deposit mystery" (day equity 94.46 vs total 174.56) resolved
+when the field was read in code — `DaySnapshot.Equity` is MANAGED
+equity (free USDT + tracked positions), not the total. Interpret
+snapshot/dashboard fields by their code definition, and date
+"when did X start" claims from file mtimes, config backups, or
+deploy logs. A field name is a hypothesis, not a fact.
+
+### 10.35 Fixture Formatting Precision Is Part of Pinned-Test Contracts
+
+**Pinned tests can depend on a test double's exact output rounding**
+(2026-08-20: the net-zero SL test computed its fill price from the
+fake's `%.4f` commission rounding; changing the fake to `%.8f` broke
+the exact-zero assertion). Changing fixture formatting is a contract
+change: check every pinned test that feeds on the formatted value,
+or make the precision explicit per field (e.g., 4 decimals for USDT
+commissions, 8 for base-asset fees) so the rounding intent is
+visible.
