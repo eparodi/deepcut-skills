@@ -809,3 +809,88 @@ change: check every pinned test that feeds on the formatted value,
 or make the precision explicit per field (e.g., 4 decimals for USDT
 commissions, 8 for base-asset fees) so the rounding intent is
 visible.
+
+### 10.36 Test-Env Seed Persistence Gates Silently Drop Fixtures
+
+**A test harness that persists its seed state only when some sentinel
+field is non-zero silently drops a fixture whose new/zero-valued
+fields don't trip the gate — the test then passes against an unseeded
+store** (2026-08-22: a bot fixture seeded with only a new state field
+never reached the store until a sentinel was set). A fixture that must
+be restored must also satisfy the gate's condition, or the gate must
+be widened for the new field type.
+
+### 10.37 Rollover-Driven Accumulators Must Survive the Process's First Save
+
+**The first save of a process lifetime can run before a rollover
+driver has produced its first value — an unconditional write of the
+in-memory accumulator then clobbers the restored value** (2026-08-19:
+the startup save reset a restored LLM lifetime bank before the first
+budget roll). Tracking fields must update only when the driver yields
+a non-empty value.
+
+### 10.38 Verify the Worktree HEAD Before Branching
+
+**`git fetch origin main:main` moves the ref, not a detached
+worktree's HEAD — `git checkout -b` in that worktree silently bases
+the branch on an older commit** (2026-08-19: a feature branch was cut
+3 commits behind main, forcing a mid-task rebase). Compare
+`git rev-parse HEAD` with the target ref before branching; re-checkout
+if they differ.
+
+### 10.39 Multi-Series Charts Need a Legend and a Per-Series Palette
+
+**A chart that draws more than one series must render a legend and
+assign each series its own color** — otherwise every series draws in
+one color and end-of-line labels collide when lines finish near the
+same point (2026-08-20: an arena chart rendered every strategist in
+the same blue).
+
+### 10.40 Bar Width Must Be Gap-Aware
+
+**Bar width derived from the series count (not the x-gap) draws
+clustered bars on top of each other and makes lone bars comically
+fat** — width = min(count rule, 0.8 × smallest adjacent gap), sorted
+by X inside the renderer (2026-08-20: bot bar charts; fixed with the
+gap-aware rule).
+
+### 10.41 Themed SVG: Split Class Names by CSS Property
+
+**When theming inline SVG via CSS classes, class the data colors by
+CSS property (`stroke-c-*` vs `fill-c-*`) so a stroke rule can never
+clobber a path's `fill="none"`** (2026-08-20: chart dark-mode work —
+the property split prevents a blanket color rule from filling unfilled
+paths).
+
+### 10.42 Bundled Enhancements Need Per-Page Presence Pins
+
+**A controller shipped in a shared JS bundle does nothing on any page
+that fails to load the bundle — "shipped" features are dead everywhere
+except the page where the script tag was first added** (2026-08-20:
+chart tooltips never ran on 7 of 8 pages because the tag lived only in
+one template). Load the bundle in the SHARED layout and pin its
+presence on every page.
+
+### 10.43 Hover/Tooltip Data Lives on the Visible Element
+
+**Tooltip data (`<title>`) attached to an invisible helper shape is
+dead UI — the user never points at it** (2026-08-20: a 4px invisible
+hover circle carried the bar tooltips). Put the data INSIDE the
+element the user actually hovers.
+
+### 10.44 Backfill Paths Must Preserve the Entity's Temporal Position
+
+**When a record carries an explicit temporal position (a date), that
+position IS the timestamp — the recording moment is only the fallback**
+(2026-08-20: three dated capital flows were stamped `now` and rendered
+as a vertical line). Backfill/import paths must stamp from the
+entity's date, and corrupted live data is repaired in place (backup
+first).
+
+### 10.45 Text-Only Models Need a File-Based Vision Pipeline
+
+**Embedding a screenshot PNG into a text-only model's context crashes
+the next call (`UNSUPPORTED_CONTENT`)** — visual QA must render to a
+FILE and pass plain-text references to it (2026-08-21:
+`browser_screenshot` crashed a QA session twice; the file-based
+pipeline recovered it).
