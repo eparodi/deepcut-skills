@@ -78,7 +78,7 @@ Facts that shape the design:
    dropped from all profiles.
 2. Pilot measures with **verified prices** (table above), not tokens
    alone.
-3. "Other projects" **includes repos outside noir-hq**; the porter
+3. "Other projects" **includes repos outside the org**; the porter
    writes paste-ready export files inside skills-test (it cannot write
    outside the repo boundary).
 4. Model IDs resolved as above.
@@ -139,7 +139,7 @@ skill costs context tokens on every thread).
 ### User Story 3: Learning porter
 
 As the system operator, I want a learning-porter agent that moves
-session learnings across repos — including projects outside noir-hq —
+session learnings across repos — including projects outside the org —
 so a correction logged in one project prevents the same mistake in the
 others.
 
@@ -151,7 +151,7 @@ others.
   ONE shared pool (`skills-test/AGENTS.md` §10, cited as
   "skills-test AGENTS.md §10: <rule name>") and project-specific rules
   go to that repo's own §10.
-- Given a rule destined for a project outside noir-hq, When the porter
+- Given a rule destined for a project outside the org, When the porter
   runs, Then it writes a paste-ready export file inside skills-test
   (e.g., `skills-test/exports/<date>-<topic>.md`) with the generalized
   rule text; the user reviews and applies it outside — the porter
@@ -191,7 +191,7 @@ assumed.
 
 - ❌ No new dependencies, packages, or infrastructure — this is policy,
   profiles, and skill files only.
-- ❌ No changes to the trading bot's LLM budget numbers or risk rules
+- ❌ No changes to any repo's LLM budget numbers or risk rules
   (operator/financial decisions, separate from this spec).
 - ❌ No automatic, ungated skill creation — the factory only drafts
   from evidence; adoption needs human approval.
@@ -255,8 +255,8 @@ Components:
 | D2.4 | Escalation = handoff block, never context re-read | Input tokens dominate cost and Pro costs ~3× Flash; Pro re-reading files Flash already read doubles the expensive part. Pro may re-read only when a cited excerpt is insufficient |
 | D2.5 | Pilot: 2 task classes, 7 days | (a) mechanical file ops/test runs, (b) session-log/retro drafts — high-frequency, low-blast-radius, representative of the "80% Flash" target |
 | D2.6 | USD measured from the verified price table, tokens from the DeepSeek platform usage page; peak vs off-peak split by UTC hour in the tracker | Zed threads are not instrumented by repo code; the platform is the token source of truth. [Unverified] whether the platform breaks down peak/off-peak — if not, the tracker logs call time bands |
-| D2.7 | US1 AC4 (price-aware telemetry) is satisfied for Zed threads by the pilot tracker. Extending the bot's `internal/llm` telemetry with tier+price fields touches application code in deepcut-binance-bot → separate follow-up spec there | This spec's non-goal: no application code changes. Flagged here so the AC interpretation is explicit |
-| D2.8 | Pre-existing per-repo profile divergence is NOT reconciled (e.g., skills-test registry lacks reviewer/qa/security profiles that exist in the bot repo) | Out of scope for a cost-optimization spec; flagging so implementation doesn't silently "fix" it |
+| D2.7 | US1 AC4 (price-aware telemetry) is satisfied for Zed threads by the pilot tracker. Extending an app's LLM telemetry with tier+price fields touches application code in a consuming repo → separate follow-up spec there | This spec's non-goal: no application code changes. Flagged here so the AC interpretation is explicit |
+| D2.8 | Pre-existing per-repo profile divergence is NOT reconciled (e.g., the hub registry lacks reviewer/qa/security profiles that exist in a consuming repo) | Out of scope for a cost-optimization spec; flagging so implementation doesn't silently "fix" it |
 | D2.9 | Zed-side provider/model wiring is delivered as a reference snippet the user applies | Repo boundary is a hard wall; Zed settings live outside the repos |
 
 ## D3. Routing Policy (canonical table)
@@ -363,7 +363,7 @@ Location: `skills-test/.agents/skills/skill-factory/SKILL.md`. Runs on Pro.
 Workflow (gated phases):
 
 1. **Evidence gate** — search `specs/memories/*-session-log.md` and
-   retros in all three repos. A task pattern qualifies with ≥2
+   retros across the repos. A task pattern qualifies with ≥2
    occurrences across ≥2 distinct sessions/dates, or ≥3 total. If not
    met: refuse and report what evidence would qualify.
 2. **Dedupe gate** — grep the existing skill roster; if a skill covers
@@ -424,13 +424,15 @@ Location: `skills-test/.agents/skills/learning-porter/SKILL.md`. Runs on Pro.
 Workflow:
 
 1. **Collect** — input: a session log / retro path, or "new since
-   `<date>`" across the three repos.
+   `<date>`" across the repos.
 2. **Extract** — pull each correction row / retro mistake.
 3. **Distill** — root-cause → rule pair, in the §10 citation format.
 4. **Classify** (rubric):
    - **Generic** ⇔ the rule text contains zero repo-specific
      identifiers (file paths, package names, table names, bot/stream
-     vocabulary) and is actionable in ≥2 repos → shared pool
+     vocabulary), no references to external projects (no project names,
+     no examples that only make sense inside one project), and is
+     actionable in ≥2 repos → shared pool
      `skills-test/AGENTS.md` §10.
    - **Repo-specific** ⇔ names this repo's internals → that repo's
      AGENTS.md §10.
@@ -442,7 +444,7 @@ Workflow:
 6. **Generalize** — rewrite for portability (see skills-test AGENTS.md
    §10 examples for tone and length).
 7. **Write** — rule text as a reviewable diff. For projects OUTSIDE
-   noir-hq: a paste-ready export file
+   the org: a paste-ready export file
    `skills-test/exports/<YYYY-MM-DD>-<topic>.md` containing: source
    citation (repo, date, event #), generalized rule, classification
    rationale, suggested placement. The porter never writes outside the
@@ -483,13 +485,11 @@ Create:
 Edit:
 
 5. `skills-test/zed/profiles.json` — tier update, 2 new profiles, v1.4.0
-6. `deepcut-live/zed/profiles.json` — tier update, v1.4.0
-7. `deepcut-binance-bot/zed/profiles.json` — tier update, v1.4.0
-8. `skills-test/HOW_WE_WORK.md` — routing policy, ladder, handoff
+6. Each consuming repo's `zed/profiles.json` — tier update, v1.4.0
+7. `skills-test/HOW_WE_WORK.md` — routing policy, ladder, handoff
    template, factory/porter rows, pilot instructions
-9. `deepcut-live/HOW_WE_WORK.md` — model columns → tiers + pointer
-10. `deepcut-binance-bot/HOW_WE_WORK.md` — model columns → tiers + pointer
-11. `skills-test/AGENTS.md` — add §10.20 (text below)
+8. Each consuming repo's `HOW_WE_WORK.md` — model columns → tiers + pointer
+9. `skills-test/AGENTS.md` — add §10.20 (text below)
 
 Proposed §10.20 (skills-test AGENTS.md) — exact text for approval:
 
@@ -509,8 +509,8 @@ Pro never re-reads context Flash already read.
 ## D10. Scope Clarifications
 
 - **US1 AC4** is satisfied for Zed threads by the pilot tracker
-  (D2.7); bot-side telemetry extension is a follow-up spec in
-  deepcut-binance-bot.
+  (D2.7); an app-side telemetry extension is a follow-up spec in the
+  consuming repo.
 - **UX Designer:** N/A.
 - **Not reconciled:** pre-existing profile divergence across the three
   registries (D2.8).
@@ -544,48 +544,37 @@ validation command per task.
    both new profile ids present
    → Satisfies: US1 AC1
 
-4. [x] [P] (Architect) Update `deepcut-live/zed/profiles.json` — tier
-   mapping per D5, version 1.4.0
+4. [x] [P] (Architect) Update each consuming repo's `zed/profiles.json`
+   — tier mapping per D5, version 1.4.0
    → Test: same as task 3 (file-local)
    → Satisfies: US1 AC1
 
-5. [x] [P] (PM) Update `deepcut-live/HOW_WE_WORK.md` — model columns →
-   Flash/Pro + pointer to canonical policy
-   → Test: grep `deepseek-v4-flash` + skills-test pointer present;
-   `claude-opus` absent
-   → Satisfies: US1 AC2
-
-6. [x] [P] (Architect) Update `deepcut-binance-bot/zed/profiles.json` —
-   tier mapping per D5, version 1.4.0
-   → Test: same as task 3 (file-local)
-   → Satisfies: US1 AC1
-
-7. [x] [P] (PM) Update `deepcut-binance-bot/HOW_WE_WORK.md` — model
+5. [x] [P] (PM) Update each consuming repo's `HOW_WE_WORK.md` — model
    columns → Flash/Pro + pointer to canonical policy
    → Test: grep `deepseek-v4-flash` + skills-test pointer present;
    `claude-opus` absent
    → Satisfies: US1 AC2
 
-8. [x] (Skills) Create `skills-test/.agents/skills/skill-factory/SKILL.md`
+6. [x] (Skills) Create `skills-test/.agents/skills/skill-factory/SKILL.md`
    → Test: YAML-parse frontmatter (skills-test AGENTS.md §10.12
    command), then execute the skill's declared test task (refuse with
    no evidence; draft with evidence; draft passes YAML check)
    → Satisfies: US2 (all ACs)
 
-9. [x] (Skills) Create `skills-test/.agents/skills/learning-porter/SKILL.md`
+7. [x] (Skills) Create `skills-test/.agents/skills/learning-porter/SKILL.md`
    → Test: YAML-parse frontmatter, then execute the skill's declared
    test task (one real correction → distilled rule → classification +
    dedupe check)
    → Satisfies: US3 (all ACs)
 
-10. [x] (PM) Create `skills-test/specs/pilot/agent-cost-pilot.md`
-    → Test: grep tracker schema columns + exit criteria present
-    → Satisfies: US4 (all ACs)
+8. [x] (PM) Create `skills-test/specs/pilot/agent-cost-pilot.md`
+   → Test: grep tracker schema columns + exit criteria present
+   → Satisfies: US4 (all ACs)
 
-11. [x] (Architect) Create `skills-test/zed/zed-settings-snippet.json`
-    → Test: `python3 -m json.tool` parses; contains
-    `deepseek-v4-flash` + `deepseek-v4-pro` entries per Zed docs
-    → Satisfies: US1 AC1 (Zed-side wiring reference)
+9. [x] (Architect) Create `skills-test/zed/zed-settings-snippet.json`
+   → Test: `python3 -m json.tool` parses; contains
+   `deepseek-v4-flash` + `deepseek-v4-pro` entries per Zed docs
+   → Satisfies: US1 AC1 (Zed-side wiring reference)
 
 Completion: all `[x]` → status `Implemented`. Commits: one per task,
 branch `feat/agent-cost-optimization` per repo, pushed (no PR unless
@@ -598,15 +587,15 @@ CI gates apply; user merges).
   relative (e.g., `backend/`), and there is no cross-repo path form;
   the factory writes only inside skills-test by convention, and the
   porter's AGENTS.md writes are gated on user approval regardless.
-- **UI Engineer row** (bot repo HOW_WE_WORK table): tiered Flash/Pro
+- **UI Engineer row** (a consuming repo's HOW_WE_WORK table): tiered Flash/Pro
   like the other engineer roles; the row existed without a
   corresponding profile entry (pre-existing divergence, D2.8).
 - **Factory test task executed (2026-08-15):** refusal path passed
   (synthetic pattern, 0 evidence); evidence path passed — the
   "multi-edit batch corruption" pattern qualifies (skills-test
-  2026-08-13 #1; bot 2026-08-13 #77 + retro; bot 2026-08-14 #22 +
-  retro) and produced a YAML-valid draft declaring a model tier;
-  scaffolding deleted after validation.
+  2026-08-13 #1; another repo 2026-08-13 #77 + retro; another repo
+  2026-08-14 #22 + retro) and produced a YAML-valid draft declaring a
+  model tier; scaffolding deleted after validation.
 - **Porter test task executed (2026-08-15):** correction #1 from the
   2026-08-13 skills-test session log distilled + classified generic,
   then correctly DECLINED as duplicate — already covered by §10.11 +

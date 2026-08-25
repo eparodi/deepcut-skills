@@ -1,8 +1,8 @@
 # Financial Role — Research Sources
 
 Gathered 2026-08-13 to seed the `financial-analyst` skill (template
-version lives in `skills-test`; the reference implementation is
-`deepcut-binance-bot`). Quality
+version lives in `skills-test`; the reference implementation is a
+trading system's risk spec). Quality
 bar: **academic, institutional, or regulator-grade only.** No signal
 sellers, no "99% win rate" gurus, no Telegram channels, no sites that sell
 you a strategy. Anything below marked `[Unverified]` could not be fetched
@@ -16,7 +16,7 @@ by the agent (bot protection) — verify before citing.
 | Markowitz (1952), "Portfolio Selection", *Journal of Finance* 7(1):77–91 | Classic, public | Diversification/portfolio theory — underpins the exposure cap (30%) and why independent per-symbol positions are not the same as account-level safety. |
 | Liu & Tsyvinski (2021), "Risks and Returns of Cryptocurrency", *Review of Financial Studies* 34(6):2689–2727. NBER w24877 **verified 2026-08-13** via nber.org | [NBER](https://www.nber.org/papers/w24877) | Peer-reviewed evidence on crypto return factors: time-series momentum + investor attention. Directly relevant to what the personas should (and shouldn't) look at; a sanity check against TA folklore. |
 | Makarov & Schoar (2020), "Trading and Arbitrage in Cryptocurrency Markets", *Journal of Financial Economics* 135(2):293–319 `[Unverified link]` | SSRN/JFE | The serious academic reference on crypto market microstructure, exchange fragmentation, and arbitrage — good grounding for fee/slippage realism. |
-| López de Prado (2018), "The 10 Reasons Most Machine Learning Funds Fail", *Journal of Portfolio Management* 44(4):72–81 `[Unverified link]` | SSRN/JPM | The canonical warning list for ML-in-trading: backtest overfitting, non-stationarity, insufficient sample size. **This is the anti-scam lens for our own bot** — every new indicator/rule must survive these critiques. |
+| López de Prado (2018), "The 10 Reasons Most Machine Learning Funds Fail", *Journal of Portfolio Management* 44(4):72–81 `[Unverified link]` | SSRN/JPM | The canonical warning list for ML-in-trading: backtest overfitting, non-stationarity, insufficient sample size. **This is the anti-scam lens for our own trading system** — every new indicator/rule must survive these critiques. |
 | Thorp (2006), "The Kelly Criterion in Blackjack, Sports Betting, and the Stock Market", *Handbook of Asset and Liability Management* `[Unverified link]` | Elsevier | How an actual quant legend applies Kelly in practice, including partial-Kelly sizing — the closest published analogue to our `position_fraction` rule. |
 
 ## Verified institutional / education sources
@@ -39,7 +39,7 @@ by the agent (bot protection) — verify before citing.
   fundamentals and professional risk-management material.
   https://www.cmegroup.com/education/
 - **Binance official API docs** `[Unverified — JS-rendered]` — the
-  authoritative exchange mechanics our bot already consumes:
+  authoritative exchange mechanics the system consumes:
   `LOT_SIZE`, `MIN_NOTIONAL`, `MARKET_LOT_SIZE` filters, fee schedules,
   error codes. https://developers.binance.com/docs/binance-spot-api-docs
 
@@ -98,7 +98,7 @@ Sources/claims that fail this bar and must never enter the spec:
    (10% slice, 30% cap, 5% breaker) or only *review* changes to them?
    (The spec currently treats the risk layer as deliberately static.)
 2. Do you want a written "risk policy" doc (sizing rationale, maximum
-   drawdown tolerance, when the bot gets shut off) as the role's first
+   drawdown tolerance, when the system gets shut off) as the role's first
    deliverable?
 3. Is VaR or max-drawdown-based reporting wanted for the dashboard
    (currently: equity history only)?

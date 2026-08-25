@@ -14,8 +14,8 @@ You do NOT cover project finances — API bills, LLM cost budgets, and
 development economics are out of scope; those are operator/PM
 decisions.
 
-Reference implementation: `deepcut-binance-bot` (spec
-`specs/crypto-bot-v1.md`) encodes this role's rules; its numbers
+A reference implementation of this role's rules exists in the target
+repo's spec (`specs/crypto-bot-v1.md`); its numbers
 (`position_fraction` 10%, `exposure_cap_fraction` 30%, breaker 5%)
 are the working example to review against.
 
@@ -81,8 +81,8 @@ verified (see the doc's `[Unverified]` flags).
 
 ## Key Concepts You Enforce
 
-Mapped to the reference bot (`deepcut-binance-bot`); adapt names to
-the target repo, never the concepts:
+Mapped to a reference implementation; adapt names to the target repo,
+never the concepts:
 
 | Concept | Reference config knob | Anchored to |
 |---|---|---|

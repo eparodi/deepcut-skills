@@ -1,21 +1,21 @@
 # AI Engineer Role — Research Sources
 
 Gathered 2026-08-13 to seed the `ai-engineer` skill (template version
-lives in `skills-test`; the reference implementation is
-`deepcut-binance-bot`). Goal of the role:
+lives in `skills-test`; the reference implementation is a prior LLM
+layer built against this exact spec). Goal of the role:
 improve the DeepSeek connection — (1) handle malformed responses better and
 (2) reduce the number/cost of requests to DeepSeek.
 
 ## Where the pain is today (codebase facts)
 
-- `internal/llm/deepseek.go`: single-shot POST to `/chat/completions`,
+- The provider client: single-shot POST to `/chat/completions`,
   60s HTTP client timeout, **no retry, no backoff, no cache, no
   response_format**, body read capped at 1 MiB. Non-200 → error, empty
   choices → error.
-- `internal/ensemble/agent.go`: malformed persona JSON → HOLD + warning
+- The decision agent: malformed persona JSON → HOLD + warning
   (spec-mandated, correct behavior — but no repair attempt, no one-shot
   re-prompt, no fenced-codeblock extraction).
-- `internal/ensemble/ensemble.go`: every cycle = 3 persona calls per
+- The ensemble loop: every cycle = 3 persona calls per
   symbol (N symbols × 3 × 1 per 15m), plus reflection calls hourly.
   `MaxTokens: 800`, `llmTimeout: 60s`, parallel per symbol.
 
@@ -51,11 +51,11 @@ improve the DeepSeek connection — (1) handle malformed responses better and
 
 ## Reference repos (verified via GitHub API, 2026-08-13)
 
-| Repo | Stars | What it teaches this bot |
+| Repo | Stars | What it teaches this system |
 |---|---|---|
 | [BerriAI/litellm](https://github.com/BerriAI/litellm) | ~56.3k | The reference design for LLM gateways: retries with exponential backoff, fallbacks across models/providers, caching layers, rate-limit awareness, per-request cost tracking. Read their retry/fallback docs for the exact taxonomy of "which errors to retry". |
 | [567-labs/instructor](https://github.com/567-labs/instructor) | ~13.7k | Structured-output library. Key ideas: validate the parsed object against a schema, and **automatically re-prompt once with the validation error** before failing. This is the canonical malformed-response recovery loop. (formerly instructor-ai/instructor) |
-| [BoundaryML/baml](https://github.com/BoundaryML/baml) | ~9.0k | Declarative function schemas + explicit **retry policies** (`RetryPolicy` with per-failure-type behavior) for LLM calls. Good mental model for config-driven retry in the bot. |
+| [BoundaryML/baml](https://github.com/BoundaryML/baml) | ~9.0k | Declarative function schemas + explicit **retry policies** (`RetryPolicy` with per-failure-type behavior) for LLM calls. Good mental model for config-driven retry in the system. |
 | [promptfoo/promptfoo](https://github.com/promptfoo/promptfoo) | ~24.2k | LLM **eval/regression testing**: run prompt variants against pinned inputs, assert output shape. The right pattern for the persona-prompt test suite (and it explicitly supports DeepSeek). |
 | [openai/openai-cookbook](https://github.com/openai/openai-cookbook) | ~75.2k | Official OpenAI patterns: rate-limit handling with backoff, prompt caching, structured outputs, "how to count tokens first" (estimate and truncate history). DeepSeek is protocol-compatible, so most recipes transfer. |
 | [anthropics/claude-cookbooks](https://github.com/anthropics/claude-cookbooks) | ~51.5k | Prompt-caching best practices (static prefix → dynamic suffix), JSON mode usage, multi-turn context management. |
@@ -99,10 +99,10 @@ improve the DeepSeek connection — (1) handle malformed responses better and
 
 - AGENTS.md forbids new dependencies without explicit user approval —
   treat openai-go as a *candidate*, not a plan.
-- The four interfaces (`Provider`, `DecisionMaker`, `MemoryStore`,
-  `Sampler`) are the spec contract; all of the above must sit behind
-  `Provider`/`DecisionMaker`, never change their signatures unilaterally.
-- Malformed → HOLD is spec-mandated behavior (US3). A retry ladder changes
+- The spec's provider/decision interfaces are the contract; all of the
+  above must sit behind them, never change their signatures
+  unilaterally.
+- Malformed → HOLD is spec-mandated behavior. A retry ladder changes
   request counts → spec change, not silent code change.
 - Test data must use obviously-fake API keys (`test_`, `fake_`).
 

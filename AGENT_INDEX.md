@@ -1,6 +1,6 @@
-# Agent Index — noir-hq
+# Agent Index
 
-> Canonical roster of every agent skill in the noir-hq repos.
+> Canonical roster of every agent skill in the repos.
 > Last updated: 2026-08-15. Sources: `*/zed/profiles.json` (v1.4.0),
 > `*/.agents/skills/*/SKILL.md`.
 >
@@ -18,39 +18,39 @@ Tiers: F = Flash default, P = Pro default; "heavy" = escalation tier.
 
 | Role | Scope (one line) | Tier (default/heavy) | Tools | Where |
 |---|---|---|---|---|
-| `pm` | Requirements, user stories, task breakdown, spec lifecycle | F / P | read/write, no terminal | all 3 repos |
-| `architect` | Architecture, API contracts, data models, tech decisions | P / — | read/write, no terminal | all 3 repos |
-| `ux-designer` | UI design, components, tokens, accessibility, UX copy | F / P | read/write, no terminal | all 3 repos |
-| `backend-engineer` | Go/chi API implementation in `backend/` | F / P | full + terminal | skills-test, deepcut-live |
-| `frontend-engineer` | Next.js App Router implementation in `frontend/` | F / P | full + terminal | skills-test, deepcut-live |
-| `mobile-engineer` | Expo/React Native in `mobile/` | F / P | full + terminal | skills-test, deepcut-live |
-| `ai-engineer` | LLM layer: provider client, malformed-response ladder, retries/breaker, token telemetry, cost budget | F / P | full + terminal + fetch | skills-test, deepcut-binance-bot |
-| `db-analyst` | Postgres migrations, store/query layer, data integrity, test-DB strategy | P / — | full + terminal | skills-test, deepcut-live |
-| `financial-analyst` | Trading money: risk rules, sizing, capital, PnL/fees, breaker semantics | P / — | read/write + fetch, no terminal | skills-test, deepcut-binance-bot |
-| `bot-engineer` | All Go implementation in the bot repo | F / P | full + terminal | deepcut-binance-bot |
-| `ui-engineer` | Bot dashboard: Go html/template + folder-per-component CSS/JS | F / P | full + terminal | deepcut-binance-bot |
-| `reviewer` | PR review: correctness, style, security, standards | F / P | read + terminal, no writes | all 3 repos |
-| `qa` | Validates features vs spec, runs suites, QA reports | F / — | read + terminal, no writes | all 3 repos |
-| `security-engineer` | Security audits, local pentesting, security reports | P / — | read + terminal, no writes | all 3 repos |
-| `orchestrator` | Single-thread 4-role loop (PLANNER/CODER/REVIEWER/DEBUGGER) | F / P | full + terminal | all 3 repos |
-| `skill-factory` | Creates super-specific agent skills from recurring evidence (gated) | P / — | read/write + terminal | skills-test |
-| `learning-porter` | Moves learnings across repos: distill, classify, dedupe, export | P / — | read/write, no terminal | skills-test |
+| `pm` | Requirements, user stories, task breakdown, spec lifecycle | F / P | read/write, no terminal | all repos |
+| `architect` | Architecture, API contracts, data models, tech decisions | P / — | read/write, no terminal | all repos |
+| `ux-designer` | UI design, components, tokens, accessibility, UX copy | F / P | read/write, no terminal | all repos |
+| `backend-engineer` | Go/chi API implementation in `backend/` | F / P | full + terminal | hub + per-repo copy |
+| `frontend-engineer` | Next.js App Router implementation in `frontend/` | F / P | full + terminal | hub + per-repo copy |
+| `mobile-engineer` | Expo/React Native in `mobile/` | F / P | full + terminal | hub + per-repo copy |
+| `ai-engineer` | LLM layer: provider client, malformed-response ladder, retries/breaker, token telemetry, cost budget | F / P | full + terminal + fetch | hub + per-repo copy |
+| `db-analyst` | Postgres migrations, store/query layer, data integrity, test-DB strategy | P / — | full + terminal | hub + per-repo copy |
+| `financial-analyst` | Trading money: risk rules, sizing, capital, PnL/fees, breaker semantics | P / — | read/write + fetch, no terminal | hub + per-repo copy |
+| `bot-engineer` | All Go implementation of the trading bot | F / P | full + terminal | per-repo copy |
+| `ui-engineer` | Trading-bot dashboard: Go html/template + folder-per-component CSS/JS | F / P | full + terminal | per-repo copy |
+| `reviewer` | PR review: correctness, style, security, standards | F / P | read + terminal, no writes | all repos |
+| `qa` | Validates features vs spec, runs suites, QA reports | F / — | read + terminal, no writes | all repos |
+| `security-engineer` | Security audits, local pentesting, security reports | P / — | read + terminal, no writes | all repos |
+| `orchestrator` | Single-thread 4-role loop (PLANNER/CODER/REVIEWER/DEBUGGER) | F / P | full + terminal | all repos |
+| `skill-factory` | Creates super-specific agent skills from recurring evidence (gated) | P / — | read/write + terminal | hub only |
+| `learning-porter` | Moves learnings across repos: distill, classify, dedupe, export | P / — | read/write, no terminal | hub only |
 
 ## Stack skills (loaded alongside a role, not roles themselves)
 
 | Skill | Covers | Where |
 |---|---|---|
-| `go-chi` | Go/chi backend standards: layering, errors, concurrency, testing, DB patterns | skills-test, deepcut-live |
-| `nextjs` | Next.js App Router standards: RSC, data fetching, caching, layouts | skills-test, deepcut-live |
-| `expo` | Expo/React Native managed-workflow standards | skills-test, deepcut-live |
-| `go-bot` | Bot repo Go standards: package layout, slog, ticker/concurrency, BoltDB, Binance/DeepSeek clients, risk guards | deepcut-binance-bot |
-| `deepcut-platform` | deepcut-live platform specifics: SRS media server, River jobs, HLS/recording paths, env vars | deepcut-live |
+| `go-chi` | Go/chi backend standards: layering, errors, concurrency, testing, DB patterns | hub + per-repo copy |
+| `nextjs` | Next.js App Router standards: RSC, data fetching, caching, layouts | hub + per-repo copy |
+| `expo` | Expo/React Native managed-workflow standards | hub + per-repo copy |
+| `go-bot` | Trading-bot Go standards: package layout, slog, ticker/concurrency, BoltDB, exchange/LLM clients, risk guards | per-repo copy |
+| `deepcut-platform` | Media-platform specifics: SRS media server, River jobs, HLS/recording paths, env vars | per-repo copy |
 
 ## Process skills
 
 | Skill | Covers | Where |
 |---|---|---|
-| `spec-driven` | 4-phase gated feature lifecycle (Requirements → Design → Tasks → Implementation) | all 3 repos |
+| `spec-driven` | 4-phase gated feature lifecycle (Requirements → Design → Tasks → Implementation) | all repos |
 
 ## Duplication & Drift
 
@@ -64,7 +64,7 @@ Tiers: F = Flash default, P = Pro default; "heavy" = escalation tier.
   subject to the same drift risk. The learning-porter is the
   designated syncer; it proposes, never auto-applies.
 - Stack skills are deliberately repo-scoped (`go-bot` only makes sense
-  in the bot repo) — duplication there is not drift, it is placement.
+  in the trading-bot repo) — duplication there is not drift, it is placement.
 
 ## Model tier policy
 

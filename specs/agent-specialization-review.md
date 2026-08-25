@@ -15,21 +15,20 @@ declarations). Roster: `skills-test/AGENT_INDEX.md`.
 2. **`db-analyst` role adopted** (user request, passed the factory
    gates): owns Postgres migrations, store/query layer, data
    integrity, test-DB strategy; Pro default; skill + profile entries
-   in skills-test and deepcut-live. Test task produced real findings:
+   in the hub and a consuming repo. Test task produced real findings:
    migrations 000001/000002 lack `IF NOT EXISTS` idempotency, no down
    migrations exist, all 4 postgres adapters correctly check
    `rows.Err()`.
-3. **E1 resolved: `mobile/` IS planned for deepcut-live** —
-   `mobile-engineer` + `expo` stay in that repo; the current absence
-   of the directory is a staging state, not a mistake.
+3. **E1 resolved: a `mobile/` workspace IS planned** —
+   `mobile-engineer` + `expo` stay in the platform repo; the current
+   absence of the directory is a staging state, not a mistake.
 4. **Migration findings (db-analyst test task): no fix** — user
    decision: leave 000001/000002 idempotency and the missing down
    migrations as-is for now.
 5. **skills-test `.gitignore` for `specs/memories/` is intentional** —
    skills-test holds the RESULT of learnings (AGENTS.md §10); it does
    not generate session learnings, so its memories stay local.
-   Per-repo repos that DO generate learnings (bot) keep committing
-   theirs.
+   Repos that DO generate learnings keep committing theirs.
 
 ## Universal finding
 
@@ -43,17 +42,17 @@ role in each repo now has a profile entry with tiers (v1.5.0).
 
 | # | Action | Files | Why |
 |---|---|---|---|
-| A1 | Tiers defined in profiles (user directive): every role now has a profile entry in its repo's registry with Flash/Pro tiers — added missing profiles (skills-test: reviewer/qa/security; deepcut-live: ai-engineer/financial-analyst/reviewer/qa/security; bot: ui-engineer); registries v1.5.0 | all 3 `zed/profiles.json` | Routing enforceable per role; skills stay tier-free |
-| A2 | Stale content fixed: bot architect risk ownership → financial-analyst; bot reviewer examples; go-bot project layout (14 real packages); live expo/nextjs nvm + nonexistent `mobile/` refs | bot + live repos | Stale facts poison threads; flagged by all 3 reviewers |
+| A1 | Tiers defined in profiles (user directive): every role now has a profile entry in its repo's registry with Flash/Pro tiers — added missing profiles (hub: reviewer/qa/security; platform repo: ai-engineer/financial-analyst/reviewer/qa/security; trading repo: ui-engineer); registries v1.5.0 | all 3 `zed/profiles.json` | Routing enforceable per role; skills stay tier-free |
+| A2 | Stale content fixed: trading-repo architect risk ownership → financial-analyst; trading-repo reviewer examples; go-bot project layout (14 real packages); platform expo/nextjs nvm + nonexistent `mobile/` refs | the consuming repos | Stale facts poison threads; flagged by all 3 reviewers |
 
 ### B. Dedupes — reduces context cost per thread [DONE 2026-08-15]
 
 | # | Action | Files | Why |
 |---|---|---|---|
-| B1 | Deleted the `## Operating Inside the Orchestrator` block from backend/frontend/mobile/ai-engineer + bot ai-engineer/bot-engineer (×9) — permission override + completion markers now live once in the compressed spec-driven pipeline | 9 files across 3 repos | Triplication paid for on every thread load |
+| B1 | Deleted the `## Operating Inside the Orchestrator` block from backend/frontend/mobile/ai-engineer + the trading repo's ai-engineer/bot-engineer (×9) — permission override + completion markers now live once in the compressed spec-driven pipeline | 9 files across 3 repos | Triplication paid for on every thread load |
 | B2 | Collapsed the two pipeline definitions: spec-driven's Post-Approval section compressed from ~190 lines (incl. 80-line bash script) to ~45; orchestrator remains the single-thread alternative; one pipeline definition | all 3 `spec-driven` copies | Two competing definitions of the same loop |
-| B3 | qa's `Security quick-check` → "Security flags": QA consumes the security-engineer report instead of re-running greps | hub + live + bot `qa` | Same checks maintained twice |
-| B4 | security-engineer's generic OWASP/crypto knowledge base → `skills-test/docs/references/security-knowledge-base.md`, loaded on demand | hub + live `security-engineer` | Generic knowledge paid for on every load |
+| B3 | qa's `Security quick-check` → "Security flags": QA consumes the security-engineer report instead of re-running greps | all three `qa` copies | Same checks maintained twice |
+| B4 | security-engineer's generic OWASP/crypto knowledge base → `skills-test/docs/references/security-knowledge-base.md`, loaded on demand | hub + platform repo `security-engineer` | Generic knowledge paid for on every load |
 
 ### C. Splits — more specific agents [propose: pick & spec]
 
@@ -62,8 +61,8 @@ pattern in session logs/retros). Candidates, strongest first:
 
 | # | Split | From | Rationale / evidence |
 |---|---|---|---|
-| C1 | `bot-engineer` → `trading-loop-engineer` (ensemble/risk/execute/memory/sampler) + `integrations-engineer` (market + llm clients) + `bot-ops` (config, systemd, deploy-pi.sh, cross-compile) | bot-engineer (174 ln, "all Go code") | "All Go code" is unmanageable; the repo now has auth/backtest/bot/bundle/dashboard/notify packages; deploy-ordering corrections recur in session logs (§10.10) |
-| C2 | `media-pipeline` (ffmpeg/SRS/HLS/recording) from go-chi's `Subprocess Hygiene` + deepcut-platform's SRS content | go-chi (888 ln) + deepcut-platform | Media failures recurred repeatedly (skills-test §10.7, §10.8: SRS payload drift, subprocess hygiene); the knowledge is split across two skills today |
+| C1 | `bot-engineer` → `trading-loop-engineer` (ensemble/risk/execute/memory/sampler) + `integrations-engineer` (market + llm clients) + `bot-ops` (config, systemd, deploy scripts, cross-compile) | bot-engineer (174 ln, "all Go code") | "All Go code" is unmanageable; the repo now has a dozen focused packages; deploy-ordering corrections recur in session logs (§10.10) |
+| C2 | `media-pipeline` (ffmpeg/SRS/HLS/recording) from go-chi's `Subprocess Hygiene` + the platform skill's SRS content | go-chi (888 ln) + deepcut-platform | Media failures recurred repeatedly (skills-test §10.7, §10.8: SRS payload drift, subprocess hygiene); the knowledge is split across two skills today |
 | C3 | `go-websocket` from go-chi's 100-line WebSocket section | go-chi | Self-contained topic, only needed by streaming work |
 | C4 | `web-ui-patterns` from nextjs's 220-line Component Patterns section | nextjs (854 ln) | Shared by frontend + dashboard UI work; nextjs itself stays routing/data-focused |
 | C5 | `eas-build-deploy` from expo's Build & Deploy section | expo (533 ln) | Deploy-only knowledge, loaded only when shipping |
@@ -72,16 +71,16 @@ pattern in session logs/retros). Candidates, strongest first:
 
 | # | Action | Details |
 |---|---|---|
-| D1 | `ux-designer` 3-way merge | Hub has the PRINCIPLES core; bot copy adds money-semantics exclusions + financial-UX hard rules + dashboard project context; live copy is stale. Merge = hub generic core + per-repo Project Context sections |
-| D2 | Decide the `orchestrator` divergence | Live copy replaced Phase 0 with hardcoded `CONTEXT INJECTION` facts (Go/Next/Node versions, port, commands) — unique value but a staleness hazard the file admits; bot copy is hub + trivial tweaks (→ canonical-ize bot). Options: (a) keep CONTEXT INJECTION but make it generated/dated, (b) revert to discovery-based Phase 0 |
-| D3 | Canonicalize the 6 byte-identical hub↔live stack/engineer copies (backend/frontend/mobile-engineer, expo, go-chi, nextjs) | They're identical today — keep one source of truth (hub) + per-repo symlink/copy discipline via the learning-porter |
+| D1 | `ux-designer` 3-way merge | Hub has the PRINCIPLES core; the trading repo's copy adds money-semantics exclusions + financial-UX hard rules + dashboard project context; the platform repo's copy is stale. Merge = hub generic core + per-repo Project Context sections |
+| D2 | Decide the `orchestrator` divergence | The platform repo's copy replaced Phase 0 with hardcoded `CONTEXT INJECTION` facts (Go/Next/Node versions, port, commands) — unique value but a staleness hazard the file admits; the trading repo's copy is hub + trivial tweaks (→ canonical-ize it). Options: (a) keep CONTEXT INJECTION but make it generated/dated, (b) revert to discovery-based Phase 0 |
+| D3 | Canonicalize the 6 byte-identical hub↔platform stack/engineer copies (backend/frontend/mobile-engineer, expo, go-chi, nextjs) | They're identical today — keep one source of truth (hub) + per-repo symlink/copy discipline via the learning-porter |
 
 ### E. Open decisions
 
 | # | Question | Status |
 |---|---|---|
-| E1 | `mobile-engineer` + `expo` in deepcut-live without `mobile/` | ✅ Resolved: `mobile/` is planned — keep the skills |
-| E2 | bot `pm`/`spec-driven` never route to `ux-designer` (bot has one) | Open |
+| E1 | `mobile-engineer` + `expo` in the platform repo without a `mobile/` directory | ✅ Resolved: `mobile/` is planned — keep the skills |
+| E2 | the trading repo's `pm`/`spec-driven` never route to `ux-designer` (it has one) | Open |
 | E3 | Splits C1–C5: which to spec now vs after the pilot | Open (recommended: wait for pilot data, 2026-08-16 start) |
 
 ## Recommended order

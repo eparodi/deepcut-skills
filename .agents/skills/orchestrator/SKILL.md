@@ -103,7 +103,7 @@ square brackets.
 
 ## REVIEWER ALWAYS-CHECKS (permanent rules — check AND apply every iteration)
 
-Derived from deepcut-live PR #27 review. REVIEWER enforces these on EVERY
+Derived from a cross-repo PR review. REVIEWER enforces these on EVERY
 iteration, in addition to the build/test/lint commands. When a check
 fails, the current role fixes it immediately — checks are not optional.
 
