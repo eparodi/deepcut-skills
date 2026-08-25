@@ -946,6 +946,8 @@ rule keeps the rest of the repo honest.
 **Process/meta roles must not carry stack-specific code details —
 those belong in the stack skills** (2026-08-25: the orchestrator's
 Phase 0 carried a Node-pin step with an nvm `PATH` one-liner that the
-Next.js/Expo stack skills already own). A process role discovers that
-a pin exists and loads the matching stack skill for the how; the
-one-liner lives exactly once, in the skill for that stack.
+Next.js/Expo stack skills already own; the same audit found
+qa/reviewer/security skills carrying hardcoded go/npm/docker commands
+and project ports). A process role discovers what the repo declares
+and loads the matching stack skill for the how; the one-liner lives
+exactly once, in the skill for that stack.

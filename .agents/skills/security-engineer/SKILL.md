@@ -16,7 +16,7 @@ implementation code — you flag issues for engineers to fix.
 
 - Access to the full codebase.
 - If performing active penetration testing, the application must be
-  running locally (`docker compose up` or `cd backend && go run ./cmd/server`).
+  running locally (via the repo's own run/compose tooling).
 - Tools that may be useful: `curl`, `nmap`, `sqlmap`, `zap`, or
   manual HTTP request crafting with `curl`.
 
@@ -102,13 +102,9 @@ grep -rn "dangerouslySetInnerHTML\|innerHTML" --include="*.tsx" .
 
 ### 5. Dependency & Supply Chain
 
-```bash
-# Go: check for known vulnerabilities
-cd backend && go list -json -m all | nancy sleuth --skip-update-check 2>/dev/null || true
-
-# Node: audit dependencies
-cd frontend && npm audit --production
-```
+Run the repo's declared dependency-audit commands from the relevant
+directories — e.g. `go list -json -m all | nancy sleuth` for Go,
+`npm audit --production` for Node.
 
 Note: `nancy` / `npm audit` may require network access. If offline, skip but flag that it wasn't run.
 
@@ -131,30 +127,30 @@ If the application is running locally, you may:
 
 ```bash
 # Check exposed ports
-docker compose ps
+docker compose ps   # or the repo's container tooling
 
 # Test auth bypass: access protected endpoint without token
-curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/me
+curl -s -o /dev/null -w "%{http_code}" http://localhost:<port>/api/me
 # Expected: 401
 
 # Test CORS: preflight from disallowed origin (use any public GET endpoint)
 curl -s -o /dev/null -w "%{http_code}" \
   -H "Origin: http://evil.com" \
   -H "Access-Control-Request-Method: GET" \
-  -X OPTIONS http://localhost:8081/api/<public-endpoint>
+  -X OPTIONS http://localhost:<port>/api/<public-endpoint>
 
 # Test security headers
-curl -sI http://localhost:8081/health
+curl -sI http://localhost:<port>/health
 
 # Test IDOR: request another user's resource by ID
-curl -s http://localhost:8081/api/<resource>/00000000-0000-0000-0000-000000000000
+curl -s http://localhost:<port>/api/<resource>/00000000-0000-0000-0000-000000000000
 
 # WebSocket: try connecting without auth (manual — check how the WS
 # endpoint derives identity; query-param identity is a red flag)
 
 # Rate limiting: send rapid requests to a public endpoint
 for i in $(seq 1 100); do
-  curl -s -o /dev/null -w "%{http_code} " http://localhost:8081/api/<public-endpoint>
+  curl -s -o /dev/null -w "%{http_code} " http://localhost:<port>/api/<public-endpoint>
 done
 ```
 
