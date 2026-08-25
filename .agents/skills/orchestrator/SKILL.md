@@ -39,10 +39,6 @@ discover and record:
    the goal is a non-trivial feature with no spec, PLANNER drafts one in
    `specs/` first (follow `spec-driven` conventions), then derives
    PLAN.md from it.
-6. **Node pin** — if a `.nvmrc` / `.node-version` exists, note the
-   version and verify `node --version` matches before ANY npm/npx command.
-   On mismatch, prefix with
-   `PATH="$HOME/.nvm/versions/node/v$(cat .nvmrc)/bin:$PATH"`.
 
 Record the result as a Context block at the top of `PLAN.md` so every
 role reads the same facts:
@@ -117,12 +113,9 @@ fails, the current role fixes it immediately — checks are not optional.
 3. **Gitignore anchoring.** New working-doc patterns must be anchored to
    the repo root (`/PLAN.md`), never bare names — bare patterns match at
    any depth and silently ignore same-named files elsewhere.
-4. **Node version guard.** If the repo pins Node (`.nvmrc`,
-   `.node-version`), verify `node --version` matches before every
-   npm/npx command.
-5. **Business-rule ambiguity.** Never resolved with an assumption —
+4. **Business-rule ambiguity.** Never resolved with an assumption —
    stop-and-ask is mandatory (AGENTS.md §3.1 if present).
-6. **Session log current.** After every correction, append to
+5. **Session log current.** After every correction, append to
    `specs/memories/<YYYY-MM-DD>-session-log.md` (AGENTS.md §9.1 if
    present); at session end, run the §9.2 retro and fold missing rules
    back into this skill or AGENTS.md.

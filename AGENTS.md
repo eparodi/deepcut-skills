@@ -940,3 +940,12 @@ so they only make sense in the source project; project/org names
 belong in the citation line only. The learning-porter's
 Classify/Generalize rubric enforces this at distillation time; this
 rule keeps the rest of the repo honest.
+
+### 10.49 Process Roles Don't Carry Stack-Specific Code Details
+
+**Process/meta roles must not carry stack-specific code details —
+those belong in the stack skills** (2026-08-25: the orchestrator's
+Phase 0 carried a Node-pin step with an nvm `PATH` one-liner that the
+Next.js/Expo stack skills already own). A process role discovers that
+a pin exists and loads the matching stack skill for the how; the
+one-liner lives exactly once, in the skill for that stack.
