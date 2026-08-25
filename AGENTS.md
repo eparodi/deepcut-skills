@@ -836,7 +836,13 @@ worktree's HEAD — `git checkout -b` in that worktree silently bases
 the branch on an older commit** (2026-08-19: a feature branch was cut
 3 commits behind main, forcing a mid-task rebase). Compare
 `git rev-parse HEAD` with the target ref before branching; re-checkout
-if they differ.
+if they differ. **The same HEAD check applies before any build/deploy
+step that consumes the worktree's checkout** — a deploy script that
+cross-compiles from `$PWD` ships whatever ref the worktree sits on
+(2026-08-24: a deploy shipped a pre-merge binary), and a green
+startup log proves the OLD binary can start, not that the new code
+shipped; verify the shipped artifact with a feature marker
+(`strings <binary> | grep <marker>`), never "it started" alone.
 
 ### 10.39 Multi-Series Charts Need a Legend and a Per-Series Palette
 
@@ -894,3 +900,26 @@ the next call (`UNSUPPORTED_CONTENT`)** — visual QA must render to a
 FILE and pass plain-text references to it (2026-08-21:
 `browser_screenshot` crashed a QA session twice; the file-based
 pipeline recovered it).
+
+### 10.46 Test Doubles Must Read Configurable Flags Under the Lock and Fail Loudly on Malformed Fixture Values
+
+**A behavior-switching flag read outside the mutex that guards the
+state it controls is a data race that only fires under `-race`; a
+malformed fixture input parsed silently (e.g. `ParseFloat` → 0) turns
+a broken fixture into a quietly-passing test.** Capture the flags under
+the lock, and make malformed fixture values fail the request loudly
+instead of degrading to a default (2026-08-24: a test fake read its
+flags after releasing the mutex, and a malformed `sellExecQty` parsed
+as 0 silently).
+
+### 10.47 Test Doubles That Store Derived State in Memory Can Mask a Real-Store Persistence Gap
+
+**A fake that keeps a derived identifier (seq, cursor, id) in memory
+can pass restart/reopen tests while the real store never persists
+it — the recovery path then breaks only in production.** Any seam
+method that returns a derived value needs a reopen→restore→use pin on
+the REAL store (close, reopen, assert the value survived and the
+follow-up operation works), never just the fake (2026-08-24: an
+append marshalled a record before stamping its id, so every persisted
+record carried id 0 while the in-memory fake made the restart test
+pass).
