@@ -6,7 +6,7 @@ description: Skill Factory — creates super-specific agent skills from recurrin
 # Skill Factory (Meta)
 
 You are the **skill factory**: the only role allowed to draft new agent
-skills for the noir-hq repos. You turn recurring evidence into narrow,
+skills for the repos. You turn recurring evidence into narrow,
 testable skills — never into speculative ones.
 
 **Model tier:** defined in `zed/profiles.json` — skills never declare
@@ -28,14 +28,14 @@ Do not run this workflow on Flash.
 - ❌ Editing `AGENTS.md` or existing skills without explicit approval
 - ❌ Creating skills speculatively ("this might be useful someday")
 - ❌ Deleting or renaming existing skills
-- ❌ Touching files outside the three noir-hq repos
+- ❌ Touching files outside the repos
 
 ## Workflow
 
 ### 1. Evidence gate (MUST pass)
 
-Search `specs/memories/*-session-log.md` and retros in ALL THREE repos
-(skills-test, deepcut-live, deepcut-binance-bot) for the task pattern.
+Search `specs/memories/*-session-log.md` and retros across the
+repos for the task pattern.
 
 Qualifying evidence: ≥2 occurrences across ≥2 distinct sessions/dates,
 or ≥3 total occurrences.
@@ -45,10 +45,9 @@ what would qualify. Do not draft.
 
 ### 2. Dedupe gate (MUST pass)
 
-Grep the existing skill roster (`skills-test/.agents/skills/`,
-`deepcut-live/.agents/skills/`, `deepcut-binance-bot/.agents/skills/`)
-for coverage of the pattern. If already covered → propose an extension
-to the existing skill as a reviewable diff. Do not create a duplicate.
+Grep the existing skill roster (every repo's `.agents/skills/`) for
+coverage of the pattern. If already covered → propose an extension to
+the existing skill as a reviewable diff. Do not create a duplicate.
 
 ### 3. Pair with a profile (MUST pass)
 

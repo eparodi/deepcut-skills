@@ -279,7 +279,7 @@
       "model": {
         "default": "deepseek-v4-pro",
         "heavy": "",
-        "reasoning": "Distills session learnings into rules and moves them across repos: generic rules to the shared pool (skills-test AGENTS.md §10), repo-specific rules to that repo's §10, and paste-ready export files for projects outside noir-hq. Pro by default: a misclassified learning gets cited everywhere and compounds."
+        "reasoning": "Distills session learnings into rules and moves them across repos: generic rules to the shared pool (skills-test AGENTS.md §10), repo-specific rules to that repo's §10, and paste-ready export files for projects outside the org. Pro by default: a misclassified learning gets cited everywhere and compounds."
       }
     },
     "db-analyst": {

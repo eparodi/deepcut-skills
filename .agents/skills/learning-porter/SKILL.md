@@ -1,6 +1,6 @@
 ---
 name: learning-porter
-description: Learning Porter — distills session corrections into rules, classifies generic vs repo-specific, dedupes, and ports learnings across the noir-hq repos and beyond. Proposes, never auto-applies.
+description: Learning Porter — distills session corrections into rules, classifies generic vs repo-specific, dedupes, and ports learnings across the repos and beyond. Proposes, never auto-applies.
 ---
 
 # Learning Porter (Meta)
@@ -17,18 +17,18 @@ cited everywhere and compounds. Do not run this workflow on Flash.
 ## What You Own
 
 - Reading session logs (`specs/memories/*-session-log.md`) and retros
-  from all three repos
+  from across the repos
 - Distilling corrections into root-cause → rule pairs
 - Classifying rules: generic (shared pool) vs repo-specific (repo §10)
 - Dedupe against existing §10 rules
-- Writing paste-ready export files for projects OUTSIDE noir-hq
+- Writing paste-ready export files for external projects
 
 ## What You Do NOT Own
 
 - ❌ Applying rule edits to any `AGENTS.md` without user approval —
   you present diffs, the user lands them
 - ❌ Inventing rules without a source correction
-- ❌ Writing to files outside the three noir-hq repos (export files
+- ❌ Writing to files outside the repos (export files
   live in skills-test; the user copies them outward)
 - ❌ Editing skills or specs
 
@@ -37,7 +37,7 @@ cited everywhere and compounds. Do not run this workflow on Flash.
 ### 1. Collect
 
 Input: a session-log / retro path, or "new since `<date>`" across the
-three repos.
+repos.
 
 ### 2. Extract
 
@@ -52,8 +52,10 @@ root cause.
 ### 4. Classify (rubric)
 
 - **Generic** ⇔ the rule text contains ZERO repo-specific identifiers
-  (file paths, package names, table names, bot/stream vocabulary) and
-  is actionable in ≥2 repos → shared pool `skills-test/AGENTS.md` §10.
+  (file paths, package names, table names, bot/stream vocabulary), NO
+  references to external projects (no project names, no examples that
+  only make sense inside one project), and is actionable in ≥2 repos
+  → shared pool `skills-test/AGENTS.md` §10.
 - **Repo-specific** ⇔ names this repo's internals → that repo's own
   `AGENTS.md` §10.
 - **Borderline** → generic pool only if it rephrases portably without
@@ -69,8 +71,10 @@ Grep both §10 pools for overlap before writing:
 
 ### 6. Generalize
 
-Rewrite the rule for portability: no repo identifiers, no dates, no
-incident numbers in the rule body (they belong in the citation line).
+Rewrite the rule for portability: no repo identifiers, no project
+names, no dates, no incident numbers in the rule body (they belong in
+the citation line). An example that only makes sense inside the source
+project must be rephrased generically or dropped.
 
 ### 7. Write
 
@@ -105,6 +109,8 @@ Nothing lands in any `AGENTS.md` until the user approves.
 - Never apply an AGENTS.md edit without approval.
 - Never fabricate a source — every rule cites a real correction.
 - Never port a rule verbatim across repos without generalizing.
+- Never write a rule body that references an external project —
+  generalize first; project names belong in the citation line only.
 - When a shared rule already covers the correction, cite it; do not
   grow §10 with variants.
 - Keep rule bodies short — a long rule is a skipped rule.

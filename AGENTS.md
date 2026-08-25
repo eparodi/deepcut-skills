@@ -89,8 +89,8 @@ DeepSeek can sound very sure about incorrect things.
   library, and mock approach already in use.
 - **API contract fidelity.** Response shapes must match the frontend
   TypeScript types exactly. No extra fields (e.g., `createdAt` not in
-  `User`), no missing fields (e.g., `streamCategory` omitted), correct
-  wrapper objects (`{streams, total}` not a bare array). When in doubt,
+  `User`), no missing fields (e.g., a required category field omitted),
+  correct wrapper objects (`{items, total}` not a bare array). When in doubt,
   grep the type definition in `frontend/src/types/index.ts`.
 - **Bidirectional verification.** When a frontend type includes a nullable
   field (e.g., `streamId: string | null`), verify the backend actually
@@ -202,7 +202,7 @@ going to do. This prevents scope creep and clarifies boundaries.
   refactors and config-only changes are test-after.
 - **Integration tests exercise real infrastructure** — `httptest.NewServer` +
   testcontainers Postgres for API flows, the docker compose stack for
-  SRS/media flows. Mocks alone don't count as the happy-path contract.
+  media/streaming flows. Mocks alone don't count as the happy-path contract.
 - **Integration tests sharing one database must not run packages in
   parallel.** `go test` runs packages concurrently by default; when every
   package truncates the same tables, one package wipes another's rows
@@ -397,7 +397,7 @@ At the end of a feature or session:
 ## Section 10 — Shared Session Learnings (from retros)
 
 Generic rules from retro analysis of corrections made across the
-noir-hq repos. They apply to EVERY repo (code style, tool discipline,
+repos. They apply to EVERY repo (code style, tool discipline,
 UI, ops, payload verification, deploy ordering) — project-specific
 learnings stay in each repo's own AGENTS.md. Cite them as
 "skills-test AGENTS.md §10: <rule name>".
@@ -418,10 +418,11 @@ have its own defaults that take precedence.
 ### 10.2 All Code Paths for Entity Creation
 
 **When multiple code paths create the same entity, audit all paths for
-side effects.** Example: SRS callbacks (`on_publish`) and the poller both
-create streams. If a side effect (thumbnail capture, notification) is
-only added to one path, it silently fails when the other path is used.
-Same trap in the trading bot: trades open from live execution, dry-run,
+side effects.** Example: a media server's publish callback
+(`on_publish`) and a poller both create stream records. If a side
+effect (thumbnail capture, notification) is only added to one path, it
+silently fails when the other path is used.
+Same trap in a trading system: trades open from live execution, dry-run,
 AND startup reconciliation — if a side effect (learning, stats update,
 exit-rule capture) is added to only one path, it silently fails on the
 others.
@@ -523,10 +524,10 @@ service when the live config contains a key the deployed binary doesn't
 define yet. Order for any config-key change: (1) deploy the new
 service, (2) verify it starts cleanly, (3) add the key to the live
 config, (4) restart. Reverse order = outage (a supervisor with
-restart-always turns it into a crash loop). Same rule bit the trading
-bot's Pi deploy: `deploy-pi.sh` ships the binary first and leaves
-config.json untouched — verify "bot started", then add the field and
-restart.
+restart-always turns it into a crash loop). Same rule bit a remote
+deploy: `deploy.sh` ships the binary first and leaves config.json
+untouched — verify the service actually started, then add the field
+and restart.
 
 ### 10.11 Claimed Edits Must Be Verified
 
@@ -539,7 +540,7 @@ section or trust ONLY the tool's success result, never memory.
 ### 10.12 SKILL.md Frontmatter Must Be YAML-Parsed, Not Eyeballed
 
 **Unquoted `description:` values containing `: ` (colon+space) are
-invalid YAML** — `deepcut-binance-bot: the provider...` breaks the
+invalid YAML** — `example: the provider...` breaks the
 frontmatter at line 3 (`mapping values are not allowed`), and the
 skill fails to load. After writing any `SKILL.md`:
 
@@ -586,7 +587,7 @@ test strings must target rendered VALUES, never labels or links** —
 a term that legitimately appears as a glossary link is not the thing
 the ban asserts; the value is what must be absent. **Spec-pinned copy
 renders verbatim on every profile/variant** unless the spec scopes it
-(the bot's /backtest empty-state run instruction).
+(a /backtest empty-state run instruction).
 
 ### 10.17 Test Configs Must Survive the Validation the Code Runs
 
@@ -602,8 +603,8 @@ without changing the behavior under test.
 consumer — never pass a zero-value struct into a template define.** A
 zero-value struct passed to a define renders REAL, visible DOM (empty
 label + empty input), not nothing. Pin each consumer's rendered output
-with a render test, including what must be ABSENT (the bot's phantom
-empty `num-input` under `<label for="symbols">` is the cautionary tale
+with a render test, including what must be ABSENT (a phantom empty
+`num-input` under `<label for="symbols">` is the cautionary tale
 — `riskFields` fed both the confirm page's rows and the settings form's
 order; the form never filtered `symbols`).
 
@@ -653,9 +654,9 @@ way (10.11).
 
 **A multi-hunk replace that partially lands leaves the file with MIXED
 old/new signatures — continuing without re-reading breaks the build
-silently (2026-08-18: `bundle/registry.go` kept the old
-`buildRegistry`/`buildLLMEnsemble` signatures after a batch whose last
-hunk failed to match; only the Build section had been rewritten).**
+silently (2026-08-18: a file kept its old function signatures after a
+batch whose last hunk failed to match; only one section had been
+rewritten).**
 After any edit batch where a hunk failed or was reworked, read the
 file (or `git diff`) and reconcile EVERY caller of the changed
 signature before building. Same family as 10.11/10.13/10.22 — the
@@ -667,8 +668,8 @@ partially-migrated file that still compiles.
 **A config layer that synthesizes defaults or validates during a
 `Validate()`/`Load()` step MUST be exercised by test fixtures the same
 way production does.** Building directly from hand-constructed structs
-bypasses defaults synthesis (2026-08-18: bundle tests failed "at least
-one strategist is required" — the registry defaults are synthesized in
+bypasses defaults synthesis (2026-08-18: tests failed a required-agent
+validation — the registry defaults are synthesized in
 `Validate`, which the tests skipped). `testCfg` helpers must call the
 same entry point as `main`; assert the synthesized defaults in the
 test, not by accident.
@@ -676,9 +677,9 @@ test, not by accident.
 ### 10.25 Stateful Fakes Advance Time Per Request
 
 **Fakes that feed time-sequenced logic must advance their
-time-dependent state on every request** (2026-08-18: the bot's fake
-exchange served the SAME 62 klines every call — the snapshot TS never
-advanced, so the arena journal's `signalTS < ts` scoring could never
+time-dependent state on every request** (2026-08-18: a fake exchange
+served the SAME 62 klines every call — the snapshot TS never
+advanced, so a journal's `signalTS < ts` scoring could never
 fire; 2023-era timestamps were additionally age-pruned by the store's
 30-day prune the moment they were saved). Candle windows, pagination
 cursors, and "next" tokens in fakes must move forward like the real
@@ -690,7 +691,7 @@ service; anchors belong at `time.Now()`-ish values (extends §10.14).
 call — the call that exhausts the budget PASSES, the veto lands on the
 next call** (2026-08-18: the budget-fired-day test needed cycle 1 to
 exhaust + cycle 2 to veto). Also: test builders must wire the same
-callbacks production wires (metrics.OnTokens → budget.Add); a budget
+callbacks production wires (token metrics → the budget adder); a budget
 that never receives token counts never vetoes. Sequence tests without
 the exhaust step assert a gate that never fires.
 
@@ -699,8 +700,8 @@ the exhaust step assert a gate that never fires.
 **When component stylesheets are bundled and inlined into every
 page's `<head>`, a class-name probe matches the CSS bundle regardless
 of the rendered markup — position assertions (e.g., "banner topmost")
-become meaningless** (2026-08-18: the C5-banner test matched
-`scoreboard-grid` inside the stylesheet). Assert on markup
+become meaningless** (2026-08-18: a banner test matched a component
+class name inside the stylesheet). Assert on markup
 (`<div class="scoreboard-grid">`, `<table …>`), and unescape
 `html/template` entities before comparing pinned copy (§10.16 — `+`
 renders `&#43;`).
@@ -708,11 +709,11 @@ renders `&#43;`).
 ### 10.28 bbolt Bucket Sweeps Enumerate Dynamic Buckets and Empty, Not Delete
 
 **A static bucket-name list is blind to per-key namespaced buckets.**
-`cycle_lessons:<persona>:<symbol>` / `cycle_lessons_cursor:*` buckets
-are invisible to a literal `"cycle_lessons_cursor"` entry — the
+`<topic>:<agent>:<symbol>` / `<topic>_cursor:*` buckets
+are invisible to a literal `"<topic>_cursor"` entry — the
 "wipe all tracking data" sweep matched nothing for them, and a
-surviving cursor would make the reflector re-distill stale rows
-(2026-08-18, `data clean`). Sweep with `tx.ForEach` + prefix
+surviving cursor would make a re-distiller reprocess stale rows
+(2026-08-18, a `data clean` command). Sweep with `tx.ForEach` + prefix
 matching. Two more bbolt traps in the same family:
 
 - **Empty buckets, never delete them** — writers that use plain
@@ -726,9 +727,9 @@ matching. Two more bbolt traps in the same family:
 ### 10.29 Shared State Blobs Are Patched, Not Replaced; Backups Never Overwritten
 
 **A full-replace save of a shared aggregate silently drops the fields
-other subsystems persist.** The bbolt `state` bucket carries the
+other subsystems persist.** A shared `state` bucket carries the
 breaker fields AND the LLM daily-budget rollover, fired-alert days,
-and the summary day (2026-08-18: `positions reconcile --apply` saved
+and the summary day (2026-08-18: a reconcile CLI saved
 the raw breaker state, wiping the persisted `$2/day` LLM cost cap —
 the next restart restored an empty budget). One-off CLIs/tools persist
 what they own: **load → patch → save**. Same family: a destructive
@@ -740,10 +741,10 @@ one — a same-day second run destroys the only pre-destruction snapshot
 
 **If a comment claims a flag clears on success, write the test that
 proves it — a transition you cannot test is a transition that cannot
-happen** (2026-08-18: the stale-flag `clearStale` claimed a
+happen** (2026-08-18: a stale flag's clearing function claimed a
 successful close clears it, but every exit path gates on
-`exitBlocked` BEFORE `closePosition`, so it was unreachable dead
-code; the FA-approved semantics were sticky-until-restart). Either
+a block flag BEFORE the close, so it was unreachable dead
+code; the approved semantics were sticky-until-restart). Either
 remove the dead code and pin the ACTUAL semantics with a test
 (restored balance → still no retries → flag persists until
 restart/reconcile), or restructure so the test passes for the right
@@ -752,8 +753,8 @@ reason.
 ### 10.31 At the Approval Gate, Restate the Operator's Original Vision
 
 **The operator's original intent can drift out of the reviewed
-artifact** (2026-08-18: the seconds-level real-time reaction vision
-was recognized as a mismatch only AFTER the closed-15m-candle design
+artifact** (2026-08-18: a seconds-level real-time reaction vision
+was recognized as a mismatch only AFTER a design that dropped it
 shipped — the gate had decided a derivative). At the approval gate,
 restate the operator's core ask as explicit acceptance criteria and
 record consciously-deferred variants (e.g., "real-time mode") as
@@ -778,7 +779,7 @@ Verify the fee currency from the fill payload, never assume it.
 
 **An in-memory view keyed by an entity that holds ONE record while
 the store keeps every record silently undercounts every aggregate**
-(2026-08-20: `a.positions[symbol]` kept the last buy; equity,
+(2026-08-20: a cache keyed by symbol kept the last buy; equity,
 exposure caps, and dashboards saw 24.93 of 131.4 USDT — the 30%
 cap was defeated and older records lost TP/SL protection until a
 restart reloaded them one at a time). When a store is per-record,
@@ -789,11 +790,11 @@ that loses money protection.
 
 ### 10.34 Claimed Facts Trace to Code or Evidence, Never Recollection
 
-**Two readings in one session:** (1) "the bot started trading
+**Two readings in one session:** (1) a claim that "trading started
 yesterday" was off by 1.5 days — the real-money switch was proven
 from `.env` mtimes and config backups (2026-08-18 14:55, not 08-19);
 (2) a "deposit mystery" (day equity 94.46 vs total 174.56) resolved
-when the field was read in code — `DaySnapshot.Equity` is MANAGED
+when the field was read in code — a day-snapshot field was MANAGED
 equity (free USDT + tracked positions), not the total. Interpret
 snapshot/dashboard fields by their code definition, and date
 "when did X start" claims from file mtimes, config backups, or
@@ -815,7 +816,7 @@ visible.
 **A test harness that persists its seed state only when some sentinel
 field is non-zero silently drops a fixture whose new/zero-valued
 fields don't trip the gate — the test then passes against an unseeded
-store** (2026-08-22: a bot fixture seeded with only a new state field
+store** (2026-08-22: a fixture seeded with only a new state field
 never reached the store until a sentinel was set). A fixture that must
 be restored must also satisfy the gate's condition, or the gate must
 be widened for the new field type.
@@ -849,15 +850,15 @@ shipped; verify the shipped artifact with a feature marker
 **A chart that draws more than one series must render a legend and
 assign each series its own color** — otherwise every series draws in
 one color and end-of-line labels collide when lines finish near the
-same point (2026-08-20: an arena chart rendered every strategist in
-the same blue).
+same point (2026-08-20: a multi-strategy chart rendered every
+strategy in the same blue).
 
 ### 10.40 Bar Width Must Be Gap-Aware
 
 **Bar width derived from the series count (not the x-gap) draws
 clustered bars on top of each other and makes lone bars comically
 fat** — width = min(count rule, 0.8 × smallest adjacent gap), sorted
-by X inside the renderer (2026-08-20: bot bar charts; fixed with the
+by X inside the renderer (2026-08-20: clustered bar charts; fixed with the
 gap-aware rule).
 
 ### 10.41 Themed SVG: Split Class Names by CSS Property
@@ -923,3 +924,19 @@ follow-up operation works), never just the fake (2026-08-24: an
 append marshalled a record before stamping its id, so every persisted
 record carried id 0 while the in-memory fake made the restart test
 pass).
+
+### 10.48 The Shared Skills Repo Must Be Free of External Project and Org References
+
+**The shared skills/learnings repo is standalone: its files must
+contain zero references to external projects (by name or via their
+internal identifiers) and zero org names** — skill files, the agent
+index, shared §10 rules, research docs, and even historical specs are
+all in scope (2026-08-25: the hub repo was scrubbed of every project
+name, org name, project file path, and project-only example —
+"Reference implementation" lines, a PR-review attribution, the
+index's Where column, and learnings citing "the bot's fake exchange"
+were all generalized). Distilled rule bodies must generalize examples
+so they only make sense in the source project; project/org names
+belong in the citation line only. The learning-porter's
+Classify/Generalize rubric enforces this at distillation time; this
+rule keeps the rest of the repo honest.

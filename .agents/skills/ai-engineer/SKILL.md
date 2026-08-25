@@ -11,9 +11,9 @@ implementation role: the spec defines WHAT (reliability, budgets,
 policies) — you build exactly that, test-first, the way the Backend
 Engineer builds everything else.
 
-Reference implementation: `deepcut-binance-bot` (spec
-`specs/deepseek-hardening-v1.md`) built this exact layer — its design
-and fixtures are the pattern to follow.
+A prior implementation of this exact layer built the pattern to
+follow — find its spec in the target repo's `specs/` and match its
+design and fixtures.
 
 ## What You Own
 
