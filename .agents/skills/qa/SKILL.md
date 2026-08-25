@@ -36,45 +36,31 @@ error states, empty states, and edge cases mentioned in the spec.
 
 ### 2. Run test suites
 
-```bash
-# Backend
-cd backend && go test ./... -count=1 -timeout 60s
+Run the repo's declared test commands — read them from the Makefile,
+`package.json` scripts, CI workflow, or the matching stack skill;
+never invent variants. Record the results. Any failing test is a
+**blocker**.
 
-# Frontend
-cd frontend && npx vitest run --reporter verbose
+### 2b. Container Build Cache Verification
 
-# Mobile (if present)
-cd mobile && npx jest --ci --reporters=default
-```
-
-Record the results. Any failing test is a **blocker**.
-
-### 2b. Docker Build Cache Verification
-
-When changes involve Dockerized services, verify the build isn't cached:
-```bash
-# Rebuild with no cache to ensure code changes are actually deployed
-docker compose build --no-cache <service>
-```
+When changes involve containerized services, verify the build isn't
+cached: rebuild with `--no-cache` via the repo's container tooling so
+code changes are actually deployed.
 
 ### 2c. Config File Verification
 
 For infrastructure config (media servers, nginx, etc.):
-- Verify the config file name matches what the Docker image's entrypoint
-  actually loads — check the startup log line; images commonly load a
-  different file than the documented one
-- Check actual file paths inside the container match config values:
-  ```bash
-  docker compose exec <svc> find / -name "<expected-artifact>" 2>/dev/null
-  ```
+- Verify the config file name matches what the container image's
+  entrypoint actually loads — check the startup log line; images
+  commonly load a different file than the documented one
+- Check actual file paths inside the container match config values
+  (find the expected artifact inside the running container).
 
 ### 3. API contract verification (backend ↔ frontend)
 
-- Grep the shared TypeScript types used by the frontend:
-  ```bash
-  grep -r "interface" frontend/src/types/index.ts
-  ```
-- Verify that every backend response struct matches those types
+- Grep the shared TypeScript types used by the frontend (e.g.
+  `frontend/src/types/index.ts`) for the interface definitions.
+- Verify that every backend response matches those types
   (field names, optionality, wrapper objects, pagination shape).
 - Verify that every frontend API call uses the exact shape the backend
   returns.
@@ -84,7 +70,8 @@ Use `grep` to cross-check; if a mismatch is found, flag it as a
 
 ### 4. Visual / runtime inspection
 
-- Run `cd frontend && npx next build` — confirm it produces no errors.
+- Run the repo's declared production build (e.g. `npm run build`
+  per the stack skill) — confirm it produces no errors.
 - Check for missing loading / empty / error states in new components
   by reviewing the component source files.
 - If a new route is added, verify it has a `<Suspense>` boundary, an
@@ -109,15 +96,13 @@ Post one PR comment with the following sections:
 **Spec:** <link or filename>
 
 ### Test Results
-- [ ] Backend tests pass
-- [ ] Frontend tests pass
-- [ ] Mobile tests pass (N/A if no mobile changes)
+- [ ] Each declared test suite passes (N/A for areas with no changes)
 
 ### API Contracts
-- [ ] Backend responses match frontend types
+- [ ] API responses match the frontend types
 
 ### Build
-- [ ] Frontend build succeeds
+- [ ] Production build succeeds
 - [ ] (any other build artifacts)
 
 ### UI States (if applicable)

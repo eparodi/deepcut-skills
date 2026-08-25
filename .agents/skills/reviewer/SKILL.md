@@ -61,11 +61,11 @@ Before reviewing:
 2. Read the PR's spec from `specs/` to understand the feature scope
 3. Read the git diff (`git diff origin/main...HEAD`)
 4. Check all new files against relevant project skill rules
-5. Verify the build compiles (`go build ./...` or `npx tsc --noEmit`)
-6. Run tests: **`go test ./... -short -count=1`** (not just `go build`). Compilation failures in test packages are still build failures.
-7. **Verify call sites match after signature changes.** If a function signature changed (new parameter, different types), grep all callers including test files: `grep -r "FuncName(" --include="*.go" .`
-8. **Check WebSocket handlers** for: auth middleware on the route, `OriginPatterns` (not `InsecureSkipVerify`), nil-guarded hub/repo access
-9. **Check third-party webhook handlers** do NOT use `DisallowUnknownFields()`
+5. Verify the build compiles using the repo's declared build command (from the Makefile/CI/stack skill — never invent variants).
+6. Run the repo's declared test command (not just the build). Compilation failures in test packages are still build failures.
+7. **Verify call sites match after signature changes.** If a function signature changed (new parameter, different types), grep all callers including test files (e.g. `grep -r "FuncName(" --include="*.go" .` in Go repos).
+8. **Check WebSocket handlers** for: auth middleware on the route, origin validation (not `InsecureSkipVerify`), nil-guarded hub/repo access
+9. **Check third-party webhook handlers** do not reject unknown vendor fields (strict `DisallowUnknownFields` breaks vendor payloads)
 
 ---
 

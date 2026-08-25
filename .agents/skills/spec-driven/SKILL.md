@@ -228,10 +228,10 @@ the Architect — do NOT silently change the contract.
 ### Test-First Rules
 
 - **Every happy path gets an integration test before implementation.**
-  The test must exercise real infrastructure — `httptest.NewServer` +
-  testcontainers Postgres (Go), or the docker compose stack for
-  media/external-service flows — not mocks alone. Mocks may accompany
-  it, but the integration test is the contract.
+  The test must exercise real infrastructure — an HTTP test server +
+  a real database (e.g. testcontainers Postgres), or the repo's docker
+  compose stack for media/external-service flows — not mocks alone.
+  Mocks may accompany it, but the integration test is the contract.
 - **Every bug found during the feature gets a regression test first.**
   Write the test that reproduces the bug (confirm it fails), then fix.
   This applies to bugs found in review, QA, or user testing.
