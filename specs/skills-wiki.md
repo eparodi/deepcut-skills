@@ -19,6 +19,14 @@ check instead of by a habit. This follows the repo family's hard-won
 lesson: documented-but-unenforced rules diverge (deepcut-binance-bot
 AGENTS.md §10.15; skills-test AGENTS.md §10.14).
 
+The wiki is the **GitHub wiki** of this repo
+(`github.com/eparodi/deepcut-skills/wiki`, git remote
+`deepcut-skills.wiki.git`) — a separate git repository whose pages GitHub
+renders. The wiki repo does **not exist yet**: GitHub creates it lazily, so
+one-time initialization (create a first page via the wiki tab) is a
+prerequisite for publishing (verified 2026-08-26: `git ls-remote
+…deepcut-skills.wiki.git` → `Repository not found`).
+
 ## Requirements
 
 ### User Story 1: Skill catalog (discoverability)
@@ -27,15 +35,15 @@ As a user, I want a browsable wiki that catalogs every skill in the hub, so
 I can discover what skills exist, what each covers, and where each lives.
 
 **Acceptance Criteria:**
-- Given the current hub skill set, When I open the wiki index, Then it
-  lists every skill in `.agents/skills/` with its one-line description and
-  a link to its page.
+- Given the current hub skill set, When I open the wiki's home page
+  (`Home.md`), Then it lists every skill in `.agents/skills/` with its
+  one-line description and a link to its page.
 - Given any skill in `.agents/skills/`, When I open its wiki page, Then it
   shows the skill's name, description (frontmatter), source file location,
   and section outline (the `##` headings of its SKILL.md).
 - Given the generated wiki, When I compare it to `.agents/skills/`, Then no
   skill is missing from the index and no page references a skill that
-  doesn't exist.
+  doesn't exist (no dead links).
 
 ### User Story 2: Single source of truth (no drift)
 
@@ -57,6 +65,9 @@ wiki can never silently diverge from the skills.
 - Given any generated wiki page, Then it carries a visible "generated from
   <source path>; do not edit by hand" marker, so generated content is never
   hand-edited.
+- Given regenerated content, When I run the publish step, Then the GitHub
+  wiki shows the same pages (a push to `deepcut-skills.wiki.git` succeeds
+  and the wiki renders the catalog).
 
 ### User Story 3: Enforcement on skill changes
 
@@ -71,12 +82,16 @@ workflow, so "every skill update → wiki update" is enforced, not promised.
   verification check runs, Then it fails until the index is regenerated.
 - Given the skill-lifecycle docs (skill-factory, learning-porter, the retro
   template in `specs/memories/README.md`), When they describe creating or
-  updating a skill, Then they reference the one-command regenerate flow.
+  updating a skill, Then they reference the one-command regenerate + publish
+  flow.
 
 ## Non-Goals
 
-- ❌ GitHub wiki or any hosted wiki — the wiki is in-repo markdown,
-  git-committed like `specs/`.
+- ❌ Self-hosted or in-repo-only wiki — the wiki IS the GitHub wiki; any
+  in-repo `wiki/` directory is only the generated build artifact (pending
+  DP-4), never the wiki itself.
+- ❌ Manual wiki page edits (GitHub UI or by hand) — every page is generated
+  from the SKILL.md files and pushed by the publish step.
 - ❌ Hand-written pages duplicating SKILL.md bodies — the catalog is
   generated; the SKILL.md stays the single source of truth.
 - ❌ Cross-repo catalog of per-repo-only skills (`bot-engineer`,
@@ -89,6 +104,16 @@ workflow, so "every skill update → wiki update" is enforced, not promised.
   skills, not learnings.
 
 ## Decision Points
+
+[NEEDS CLARIFICATION: DP-4 Publish topology]
+How generated content reaches the wiki: (a) generate into a committed
+in-repo `wiki/` mirror, then a publish script pushes it to
+`deepcut-skills.wiki.git` (the stale-check stays fully offline, matching the
+family's no-network-in-tests rule; the push is the only network touch) vs
+(b) generate directly into a clone of the wiki repo (single copy, no
+mirror, but tests depend on the clone existing).
+**Recommendation: (a)** — the check must pass without network or external
+clones; publishing is one explicit command.
 
 [NEEDS CLARIFICATION: DP-1 Toolchain]
 Go (stdlib-only; adds `go.mod` to `skills-test`; the stale-check is a
@@ -113,9 +138,12 @@ alphabetical index).
 
 - `go.mod` (module-scoped, no external dependencies)
 - `tools/wiki-gen/main.go` — reads `.agents/skills/*/SKILL.md` frontmatter
-  + headings and `wiki/catalog.json` metadata; writes `wiki/README.md`
-  (index) and `wiki/skills/<name>.md` (per skill)
+  + headings and `wiki/catalog.json` metadata; writes the wiki pages
+  (index + per-skill pages; layout pending DP-4)
 - `tools/wiki-gen/main_test.go` — `TestWikiUpToDate` (regenerate to a temp
   dir, diff), catalog-completeness test, frontmatter-parseability test over
   every current SKILL.md
-- Commands: `go run ./tools/wiki-gen` (regenerate), `go test ./...` (verify)
+- Publish step — pushes the generated pages to `deepcut-skills.wiki.git`
+  (requires the one-time wiki initialization)
+- Commands: `go run ./tools/wiki-gen` (regenerate), `go test ./...`
+  (verify), publish (push to the wiki remote)
