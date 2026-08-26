@@ -9,10 +9,10 @@ DB Analyst — owns Postgres migration mechanics, the store/query layer, data in
 
 ## Sections
 
-- What You Own
-- What You Do NOT Own
-- Workflow
-- Guardrails
-- Test Task
-- Handoff
+- [What You Own](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/db-analyst/SKILL.md#what-you-own)
+- [What You Do NOT Own](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/db-analyst/SKILL.md#what-you-do-not-own)
+- [Workflow](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/db-analyst/SKILL.md#workflow)
+- [Guardrails](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/db-analyst/SKILL.md#guardrails)
+- [Test Task](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/db-analyst/SKILL.md#test-task)
+- [Handoff](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/db-analyst/SKILL.md#handoff)
 

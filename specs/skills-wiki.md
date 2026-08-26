@@ -160,8 +160,11 @@ skills), per-skill link + one-line description, and a
 - `wiki/<name>.md` — per-skill page: name, generated-marker with the
 source path, source link to the main repo's blob URL
 (`github.com/eparodi/deepcut-skills/blob/main/...`), frontmatter
-description, category/tags/notes, and a "Sections" outline of the
-SKILL.md's `##` headings (omitted when none).
+description, category/tags/notes, and a "Sections" outline: the
+SKILL.md's `##` headings with their `###` children, each linking to its
+GitHub blob anchor (duplicate headings get GitHub's `-1`, `-2` suffixes;
+headings inside fenced code blocks are excluded so template examples
+never leak). Omitted when the skill has no `##` headings.
 
 **Pinned checks (`tools/wiki-gen/generate_test.go`)**
 
@@ -173,6 +176,9 @@ SKILL.md's `##` headings (omitted when none).
 | `TestDeterministic` | Two regenerations are byte-identical |
 | `TestHomeLinksResolve` | Every link target on the home page resolves to a generated page (no dead links) |
 | `TestPagesCarryMarker` | Every generated page carries the "do not edit" marker |
+| `TestSlugify` | GitHub anchor algorithm (verified against live blob pages) |
+| `TestSectionsSkipCodeBlocks` | Headings inside fenced code blocks never appear in the outline |
+| `TestNoTemplateLeak` | Template-embedding skills produce exactly their real section count |
 
 **Publish flow (`tools/wiki-gen/publish.sh`)**
 
@@ -199,6 +205,22 @@ SKILL.md's `##` headings (omitted when none).
 > Link syntax note: pages use plain relative markdown links
 > (`[pm](pm)`); GitHub-wiki rendering of relative links is verified on the
 > first publish, and `[[wiki]]`-style links are the fallback if needed.
+
+## Implementation Notes
+
+- **2026-08-26 (post-approval, operator feedback "the section part is
+  quite poor"):** the Sections outline was flat, unlinked, and leaked
+  template headings. Fix: (1) `headingsOf` → `sectionsOf`, which skips
+  fenced code blocks — skill-factory, learning-porter, qa,
+  security-engineer, and reviewer embed template examples whose `##`
+  headings previously polluted their outlines (skill-factory showed 12
+  sections, 6 of them from a code block); (2) the outline is now nested
+  (`##` with `###` children) and each item links to its GitHub blob
+  anchor via a github-slugger-compatible `slugify` + duplicate `-1`/`-2`
+  suffix handling, verified against the live blob pages (spec-driven's
+  anchors match byte-for-byte, including `process`/`process-1`/
+  `process-2` and `review-gate`/`review-gate-1`). Pinned by
+  `TestSlugify`, `TestSectionsSkipCodeBlocks`, `TestNoTemplateLeak`.
 
 ## Task Checklist (Phase 3)
 

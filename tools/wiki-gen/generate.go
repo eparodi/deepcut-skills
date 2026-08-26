@@ -45,7 +45,15 @@ type skill struct {
 	Name        string
 	Description string
 	SourcePath  string // repo-relative, e.g. .agents/skills/pm/SKILL.md
-	Headings    []string
+	Sections    []section
+}
+
+// section is one level-2 heading with its level-3 children, in document
+// order. Fenced code blocks are excluded: template examples must not leak
+// into the outline.
+type section struct {
+	Title string
+	Subs  []string
 }
 
 type catalogEntry struct {
@@ -124,23 +132,69 @@ func parseFrontmatter(content string) (name, description string, err error) {
 	return name, description, nil
 }
 
-// headingsOf returns the body's level-2 section headings (## ...).
-func headingsOf(content string) []string {
-	var hs []string
+// sectionsOf returns the body's section outline: level-2 headings with
+// their level-3 children, in document order. Headings inside fenced code
+// blocks (``` … ```) are skipped — SKILL.md files embed template examples
+// whose headings are not real sections (2026-08-26: skill-factory and
+// learning-porter leaked template headings into the wiki outline).
+func sectionsOf(content string) []section {
+	var sections []section
 	fences := 0
+	codeFence := false
 	for _, line := range strings.Split(content, "\n") {
-		if strings.TrimSpace(line) == "---" {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") {
+			codeFence = !codeFence
+			continue
+		}
+		if codeFence {
+			continue
+		}
+		if trimmed == "---" {
 			fences++
 			continue
 		}
 		if fences < 2 {
 			continue
 		}
-		if strings.HasPrefix(line, "## ") {
-			hs = append(hs, strings.TrimSpace(strings.TrimPrefix(line, "## ")))
+		switch {
+		case strings.HasPrefix(line, "## "):
+			sections = append(sections, section{Title: strings.TrimSpace(strings.TrimPrefix(line, "## "))})
+		case strings.HasPrefix(line, "### ") && len(sections) > 0:
+			s := &sections[len(sections)-1]
+			s.Subs = append(s.Subs, strings.TrimSpace(strings.TrimPrefix(line, "### ")))
 		}
 	}
-	return hs
+	return sections
+}
+
+// slugify converts a heading to GitHub's anchor fragment: lowercase, keep
+// [a-z0-9_-], spaces become hyphens, everything else is dropped (em dashes
+// and punctuation disappear, which is why "A — B" becomes "a--b").
+func slugify(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+			b.WriteRune(r)
+		case r == ' ':
+			b.WriteByte('-')
+		}
+	}
+	return b.String()
+}
+
+// anchorOf returns the GitHub anchor for a heading, mirroring GitHub's
+// duplicate handling: the first occurrence keeps the slug, later ones get
+// -1, -2, … suffixes. Callers must pass headings in document order.
+func anchorOf(seen map[string]int, title string) string {
+	slug := slugify(title)
+	n := seen[slug]
+	seen[slug] = n + 1
+	if n == 0 {
+		return slug
+	}
+	return fmt.Sprintf("%s-%d", slug, n)
 }
 
 // loadSkills scans skillsDir for <name>/SKILL.md and parses each one. A
@@ -173,7 +227,7 @@ func loadSkills(skillsDir string) ([]skill, error) {
 			Name:        name,
 			Description: desc,
 			SourcePath:  filepath.ToSlash(filepath.Join(skillsDirRel, dirName, "SKILL.md")),
-			Headings:    headingsOf(string(content)),
+			Sections:    sectionsOf(string(content)),
 		})
 	}
 	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
@@ -277,10 +331,16 @@ func renderSkillPage(s skill, e catalogEntry) string {
 	}
 	b.WriteString(meta + "\n\n")
 
-	if len(s.Headings) > 0 {
+	if len(s.Sections) > 0 {
 		b.WriteString("## Sections\n\n")
-		for _, h := range s.Headings {
-			b.WriteString("- " + h + "\n")
+		seen := map[string]int{}
+		for _, sec := range s.Sections {
+			href := fmt.Sprintf("%s/%s#%s", repoBlobBase, s.SourcePath, anchorOf(seen, sec.Title))
+			fmt.Fprintf(&b, "- [%s](%s)\n", sec.Title, href)
+			for _, sub := range sec.Subs {
+				subHref := fmt.Sprintf("%s/%s#%s", repoBlobBase, s.SourcePath, anchorOf(seen, sub))
+				fmt.Fprintf(&b, "  - [%s](%s)\n", sub, subHref)
+			}
 		}
 		b.WriteString("\n")
 	}

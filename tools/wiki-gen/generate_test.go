@@ -139,3 +139,68 @@ func diffTrees(t *testing.T, a, b string) {
 		t.Error(d)
 	}
 }
+
+// TestSlugify pins the GitHub anchor algorithm (verified against the live
+// blob pages 2026-08-26). Anchors drive the Sections links on skill pages.
+func TestSlugify(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"Phase 0 — Triage: \"Is This Non-Trivial?\"", "phase-0--triage-is-this-non-trivial"},
+		{"Process", "process"},
+		{"Review Gate", "review-gate"},
+		{"Quick Reference", "quick-reference"},
+		{"Common AI Hallucinations — Complete Reference", "common-ai-hallucinations--complete-reference"},
+		{"DO — Dynamic route with params (Next.js 15+)", "do--dynamic-route-with-params-nextjs-15"},
+		{"Rule: Never add `\"use client\"` unless you have to", "rule-never-add-use-client-unless-you-have-to"},
+	}
+	for _, c := range cases {
+		if got := slugify(c.in); got != c.want {
+			t.Errorf("slugify(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// TestSectionsSkipCodeBlocks pins fence-aware extraction: headings inside
+// fenced code blocks (template examples) never appear in the outline.
+func TestSectionsSkipCodeBlocks(t *testing.T) {
+	md := "---\nname: x\ndescription: y\n---\n\n# X\n\n## Real One\n\nSome text.\n\n```markdown\n## Template Heading\n## Another Template\n```\n\n## Real Two\n\n### Sub of real two\n"
+	secs := sectionsOf(md)
+	if len(secs) != 2 {
+		t.Fatalf("got %d sections, want 2: %+v", len(secs), secs)
+	}
+	if secs[0].Title != "Real One" || secs[1].Title != "Real Two" {
+		t.Errorf("unexpected sections: %+v", secs)
+	}
+	if len(secs[1].Subs) != 1 || secs[1].Subs[0] != "Sub of real two" {
+		t.Errorf("unexpected subs for Real Two: %+v", secs[1].Subs)
+	}
+}
+
+// TestNoTemplateLeak pins that skills embedding template examples (whose
+// headings live inside fenced code blocks) produce exactly their real
+// section count — regression pin for the leaked-heading bug.
+func TestNoTemplateLeak(t *testing.T) {
+	root := testRepoRoot(t)
+	skills, err := loadSkills(filepath.Join(root, skillsDirRel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, s := range skills {
+		counts[s.Name] = len(s.Sections)
+	}
+	// skill-factory, learning-porter, qa, security-engineer, and reviewer
+	// embed template examples whose headings live inside fenced code blocks;
+	// those must not leak into the outline (regression pin for fence-aware
+	// section extraction, 2026-08-26).
+	for name, want := range map[string]int{
+		"skill-factory":     6,
+		"learning-porter":   6,
+		"qa":                6,
+		"security-engineer": 7,
+		"reviewer":          5,
+	} {
+		if counts[name] != want {
+			t.Errorf("%s: %d sections, want %d (template headings leaked?)", name, counts[name], want)
+		}
+	}
+}

@@ -9,10 +9,9 @@ Code Reviewer — reviews PRs for correctness, style, security, and adherence to
 
 ## Sections
 
-- Review Scope
-- Review Format
-- Review: PR #[N] — [Title]
-- Severity Guide
-- Pre-Review Checklist
-- Automatic Trigger
+- [Review Scope](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/reviewer/SKILL.md#review-scope)
+- [Review Format](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/reviewer/SKILL.md#review-format)
+- [Severity Guide](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/reviewer/SKILL.md#severity-guide)
+- [Pre-Review Checklist](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/reviewer/SKILL.md#pre-review-checklist)
+- [Automatic Trigger](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/reviewer/SKILL.md#automatic-trigger)
 
