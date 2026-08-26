@@ -199,3 +199,26 @@ SKILL.md's `##` headings (omitted when none).
 > Link syntax note: pages use plain relative markdown links
 > (`[pm](pm)`); GitHub-wiki rendering of relative links is verified on the
 > first publish, and `[[wiki]]`-style links are the fallback if needed.
+
+## Task Checklist (Phase 3)
+
+1. [ ] (Tooling) Scaffold `go.mod`; write `tools/wiki-gen/generate_test.go`
+   (pinned checks that don't need the manifest)
+   → Test: `TestFrontmatterParses`, `TestDeterministic` (red first)
+   → Satisfies: US2 (generation, determinism)
+2. [ ] (Tooling) Implement `tools/wiki-gen/generate.go` + `main.go`
+   (regenerate + `--check`)
+   → Satisfies: US2 AC1–AC5, US1 AC2
+3. [ ] (Catalog) Create `wiki/catalog.json` for all 19 skills
+   → Test: `TestCatalogCompleteness`
+   → Satisfies: US3 AC1–AC2 (the tripwire), US1 AC1
+4. [ ] (Output) Generate `wiki/` (Home.md, _Sidebar.md, 19 pages); wire
+   `TestWikiUpToDate`, `TestHomeLinksResolve`, `TestPagesCarryMarker`
+   → Satisfies: US1 AC1–AC3, US2 AC2–AC5
+5. [ ] (Publish) Write `tools/wiki-gen/publish.sh`
+   → Satisfies: US2 AC6 (publish AC)
+6. [ ] (Docs) Wire skill-factory, learning-porter, `specs/memories/README.md`
+   to reference the regenerate + publish flow
+   → Satisfies: US3 AC3
+7. [ ] (Live) Run `publish.sh`; verify the wiki renders (link syntax check)
+8. [ ] (PR) Open PR `feat/skills-wiki` → main
