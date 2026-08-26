@@ -131,6 +131,17 @@ test-task result, and the evidence that justified creation. A human
 approves before the skill is adopted. Delete throwaway test
 scaffolding afterwards.
 
+### 8. Update the wiki (after adoption)
+
+The wiki is a generated catalog — a skill change that isn't regenerated
+fails the pinned checks (`go test ./...`). After the human approves and
+the skill lands, run from skills-test:
+
+```bash
+go run ./tools/wiki-gen        # regenerate wiki/ (verify with go test ./...)
+./tools/wiki-gen/publish.sh    # push the catalog to the GitHub wiki
+```
+
 ## Guardrails
 
 - Never draft without qualifying evidence (step 1).

@@ -34,3 +34,8 @@ Files named: `YYYY-MM-DD-feature-name-retro.md`
 2. Commit the updated skill/rules file.
 3. The retro provides traceability: "we added this rule because of
    this specific transcript on this date."
+4. If the change touched a skill (`.agents/skills/*/SKILL.md`),
+   regenerate and publish the wiki so the catalog stays current:
+   `go run ./tools/wiki-gen` then `./tools/wiki-gen/publish.sh`
+   (the pinned `go test ./...` check fails until the wiki is
+   regenerated).

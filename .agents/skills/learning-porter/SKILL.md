@@ -114,6 +114,10 @@ Nothing lands in any `AGENTS.md` until the user approves.
 - When a shared rule already covers the correction, cite it; do not
   grow §10 with variants.
 - Keep rule bodies short — a long rule is a skipped rule.
+- If a batch also lands a SKILL.md change, the generated wiki must be
+  refreshed: `go run ./tools/wiki-gen` + `./tools/wiki-gen/publish.sh`
+  from skills-test (the pinned `go test ./...` check fails until the
+  wiki matches the skills).
 
 ## Test Task
 
