@@ -1,9 +1,9 @@
 # Skills Wiki: Generated Catalog + Drift-Proofing
 
-**Status:** Approved
+**Status:** Implemented
 **Owner:** Eliseo
 **Created:** 2026-08-26
-**Updated:** 2026-08-26 (requirements approved at gate; Design added)
+**Updated:** 2026-08-26 (requirements + design approved at gates; implemented + published)
 
 ## Context
 
@@ -202,23 +202,23 @@ SKILL.md's `##` headings (omitted when none).
 
 ## Task Checklist (Phase 3)
 
-1. [ ] (Tooling) Scaffold `go.mod`; write `tools/wiki-gen/generate_test.go`
+1. [x] (Tooling) Scaffold `go.mod`; write `tools/wiki-gen/generate_test.go`
    (pinned checks that don't need the manifest)
    → Test: `TestFrontmatterParses`, `TestDeterministic` (red first)
    → Satisfies: US2 (generation, determinism)
-2. [ ] (Tooling) Implement `tools/wiki-gen/generate.go` + `main.go`
+2. [x] (Tooling) Implement `tools/wiki-gen/generate.go` + `main.go`
    (regenerate + `--check`)
    → Satisfies: US2 AC1–AC5, US1 AC2
-3. [ ] (Catalog) Create `wiki/catalog.json` for all 19 skills
+3. [x] (Catalog) Create `wiki/catalog.json` for all 19 skills
    → Test: `TestCatalogCompleteness`
    → Satisfies: US3 AC1–AC2 (the tripwire), US1 AC1
-4. [ ] (Output) Generate `wiki/` (Home.md, _Sidebar.md, 19 pages); wire
+4. [x] (Output) Generate `wiki/` (Home.md, _Sidebar.md, 19 pages); wire
    `TestWikiUpToDate`, `TestHomeLinksResolve`, `TestPagesCarryMarker`
    → Satisfies: US1 AC1–AC3, US2 AC2–AC5
-5. [ ] (Publish) Write `tools/wiki-gen/publish.sh`
+5. [x] (Publish) Write `tools/wiki-gen/publish.sh`
    → Satisfies: US2 AC6 (publish AC)
-6. [ ] (Docs) Wire skill-factory, learning-porter, `specs/memories/README.md`
+6. [x] (Docs) Wire skill-factory, learning-porter, `specs/memories/README.md`
    to reference the regenerate + publish flow
    → Satisfies: US3 AC3
-7. [ ] (Live) Run `publish.sh`; verify the wiki renders (link syntax check)
-8. [ ] (PR) Open PR `feat/skills-wiki` → main
+7. [x] (Live) Run `publish.sh`; verify the wiki renders (link syntax check)
+8. [x] (PR) Open PR `feat/skills-wiki` → main (#28)
