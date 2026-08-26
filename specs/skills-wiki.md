@@ -1,8 +1,9 @@
 # Skills Wiki: Generated Catalog + Drift-Proofing
 
-**Status:** Draft
+**Status:** Approved
 **Owner:** Eliseo
 **Created:** 2026-08-26
+**Updated:** 2026-08-26 (requirements approved at gate; Design added)
 
 ## Context
 
@@ -22,10 +23,10 @@ AGENTS.md §10.15; skills-test AGENTS.md §10.14).
 The wiki is the **GitHub wiki** of this repo
 (`github.com/eparodi/deepcut-skills/wiki`, git remote
 `deepcut-skills.wiki.git`) — a separate git repository whose pages GitHub
-renders. The wiki repo does **not exist yet**: GitHub creates it lazily, so
-one-time initialization (create a first page via the wiki tab) is a
-prerequisite for publishing (verified 2026-08-26: `git ls-remote
-…deepcut-skills.wiki.git` → `Repository not found`).
+renders. **Initialized 2026-08-26** (user created the first page): remote
+is live with a `master` branch (HEAD `40055d1`); the placeholder `Home.md`
+("Welcome to the deepcut-skills wiki!") is replaced by the generated home
+page on first publish.
 
 ## Requirements
 
@@ -103,47 +104,98 @@ workflow, so "every skill update → wiki update" is enforced, not promised.
 - ❌ Replacing retros, session logs, or `AGENTS.md` §10 — the wiki catalogs
   skills, not learnings.
 
-## Decision Points
+## Resolved Decisions (review gate, 2026-08-26)
 
-[NEEDS CLARIFICATION: DP-4 Publish topology]
-How generated content reaches the wiki: (a) generate into a committed
-in-repo `wiki/` mirror, then a publish script pushes it to
-`deepcut-skills.wiki.git` (the stale-check stays fully offline, matching the
-family's no-network-in-tests rule; the push is the only network touch) vs
-(b) generate directly into a clone of the wiki repo (single copy, no
-mirror, but tests depend on the clone existing).
-**Recommendation: (a)** — the check must pass without network or external
-clones; publishing is one explicit command.
+1. **DP-1 — Toolchain: Go, stdlib-only.** New `go.mod` (module
+   `deepcut-skills`), tool at `tools/wiki-gen/`. The stale-check is a Go
+   test: `go test ./...` from the repo root. No external dependencies.
+2. **DP-2 — Scope: hub skills only.** The catalog covers the 19 skills in
+   `skills-test/.agents/skills/`. Per-repo-only skills (`bot-engineer`,
+   `ui-engineer`, `go-bot`, `deepcut-platform`) stay in `AGENT_INDEX.md`
+   (follow-up: extend the wiki when a cross-repo view is wanted).
+3. **DP-3 — Catalog metadata: `wiki/catalog.json` manifest, validated.**
+   Bidirectional check: every skill dir must have an entry; every entry
+   must resolve; `category` ∈ {role, stack, process}. The manifest doubles
+   as the tripwire — adding a skill fails the check until it's cataloged.
+4. **DP-4 — Publish topology: in-repo mirror + push script.** Generated
+   pages are committed under `wiki/` (offline-verifiable, versioned with
+   the skills); `tools/wiki-gen/publish.sh` pushes them to
+   `deepcut-skills.wiki.git` (branch `master`).
+5. **Wiki initialized 2026-08-26.** Remote live (`master` @ `40055d1`);
+   placeholder `Home.md` replaced on first publish.
 
-[NEEDS CLARIFICATION: DP-1 Toolchain]
-Go (stdlib-only; adds `go.mod` to `skills-test`; the stale-check is a
-`go test`) vs Python3 (no `go.mod`; stale-check is a script).
-**Recommendation: Go** — `go test` is the repo family's verification bar,
-and stdlib-only keeps the "no new dependencies" rule.
+## Design (added 2026-08-26, pending gate)
 
-[NEEDS CLARIFICATION: DP-2 Catalog scope]
-Hub skills only (19) vs all three repos (23, requires scanning sibling
-worktree paths or a hand-maintained manifest for per-repo-only skills).
-**Recommendation: hub only in v1.**
+### Architecture
 
-[NEEDS CLARIFICATION: DP-3 Catalog metadata]
-Categories (role/stack/process) and tags aren't in SKILL.md frontmatter.
-Options: a small hand-maintained catalog manifest that the check validates
-(every skill must have an entry; every entry must resolve — additions fail
-the check until the manifest is updated) vs no categories (plain
-alphabetical index).
-**Recommendation: manifest with validation.**
+**Files**
 
-## Proposed Approach (sketch)
+| Path | Purpose |
+|------|---------|
+| `go.mod` | Module `deepcut-skills`, stdlib only |
+| `tools/wiki-gen/main.go` | CLI: default regenerates `wiki/`; `--check` regenerates to a temp dir and exits 1 when stale |
+| `tools/wiki-gen/generate.go` | Core: `loadSkills`, `loadCatalog`, page renderers, `generate` |
+| `tools/wiki-gen/generate_test.go` | Pinned checks (below) |
+| `tools/wiki-gen/publish.sh` | Publish flow (below) |
+| `wiki/catalog.json` | Manifest: skill → {category, tags, notes} |
+| `wiki/` | Generated output, committed: `Home.md`, `_Sidebar.md`, `<name>.md` ×19 |
 
-- `go.mod` (module-scoped, no external dependencies)
-- `tools/wiki-gen/main.go` — reads `.agents/skills/*/SKILL.md` frontmatter
-  + headings and `wiki/catalog.json` metadata; writes the wiki pages
-  (index + per-skill pages; layout pending DP-4)
-- `tools/wiki-gen/main_test.go` — `TestWikiUpToDate` (regenerate to a temp
-  dir, diff), catalog-completeness test, frontmatter-parseability test over
-  every current SKILL.md
-- Publish step — pushes the generated pages to `deepcut-skills.wiki.git`
-  (requires the one-time wiki initialization)
-- Commands: `go run ./tools/wiki-gen` (regenerate), `go test ./...`
-  (verify), publish (push to the wiki remote)
+**Frontmatter parsing** — within `---` fences, `name:` and `description:`
+are consumed; value = text after the first `:`, trimmed, optional
+surrounding double quotes stripped, trailing `\r` stripped. `name` must
+equal the skill directory name; missing/empty values are errors (pinned
+by `TestFrontmatterParses`).
+
+**Determinism** — output depends only on the skill files, the catalog, and
+the templates: skills sorted by name, no timestamps, no randomness.
+Byte-identical regeneration is pinned by `TestDeterministic`.
+
+**Generated pages**
+
+- `wiki/Home.md` — index: intro, "generated; do not edit" marker, catalog
+tables grouped by category (role agents / stack skills / process
+skills), per-skill link + one-line description, and a
+"Regenerating & publishing" section with the commands.
+- `wiki/_Sidebar.md` — GitHub-wiki sidebar: category-grouped link list.
+- `wiki/<name>.md` — per-skill page: name, generated-marker with the
+source path, source link to the main repo's blob URL
+(`github.com/eparodi/deepcut-skills/blob/main/...`), frontmatter
+description, category/tags/notes, and a "Sections" outline of the
+SKILL.md's `##` headings (omitted when none).
+
+**Pinned checks (`tools/wiki-gen/generate_test.go`)**
+
+| Test | Pins |
+|------|------|
+| `TestCatalogCompleteness` | Manifest ↔ skill-dir coverage (bidirectional), category enum |
+| `TestFrontmatterParses` | Every SKILL.md: name == dir name, non-empty description |
+| `TestWikiUpToDate` | Regenerate to temp; tree diff vs `wiki/`; fails naming stale/missing/extra files |
+| `TestDeterministic` | Two regenerations are byte-identical |
+| `TestHomeLinksResolve` | Every link target on the home page resolves to a generated page (no dead links) |
+| `TestPagesCarryMarker` | Every generated page carries the "do not edit" marker |
+
+**Publish flow (`tools/wiki-gen/publish.sh`)**
+
+1. `go run ./tools/wiki-gen` — regenerate in place.
+2. `go test ./...` — must pass (the wiki is current).
+3. Clone `deepcut-skills.wiki.git` into a temp dir.
+4. Copy the generated `wiki/*.md` files over the clone's working tree
+   (add/update only).
+5. List wiki pages that are NOT in the generated set — print them, do NOT
+   delete (the wiki may carry hand-authored pages; removing is a manual
+   decision).
+6. Commit `chore: update wiki (generated from skills)` and push `master`.
+7. Remove the temp clone.
+
+**Commands**
+
+| Command | Action |
+|---------|--------|
+| `go run ./tools/wiki-gen` | Regenerate `wiki/` |
+| `go run ./tools/wiki-gen --check` | Stale check (exit 1 when stale) |
+| `go test ./...` | Full verification (the enforced check) |
+| `./tools/wiki-gen/publish.sh` | Publish to the GitHub wiki |
+
+> Link syntax note: pages use plain relative markdown links
+> (`[pm](pm)`); GitHub-wiki rendering of relative links is verified on the
+> first publish, and `[[wiki]]`-style links are the fallback if needed.
