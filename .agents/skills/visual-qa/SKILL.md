@@ -90,6 +90,31 @@ The loader is strict: unknown actions/fields, missing names,
 duplicate names, or empty steps exit 2 naming the case/step BEFORE a
 browser launches. Run the flow to confirm a new case parses.
 
+### 3b. Choosing a checklist (the library)
+
+The default 8-item quick checklist is fine for a first pass. For
+thorough per-device QA, `tools/visualqa/checklists/` holds curated,
+source-backed checklists (Google web.dev, W3C/WCAG 2.2, NN/g,
+Smashing, CSS-Tricks, MDN, LukeW, A List Apart, Baymard — see
+`docs/research/visual-qa-device-design-sources.md`) grouped by type:
+
+```bash
+# one group on mobile (the primary design target)
+go run ./tools/visualqa --url <url> --device mobile \
+  --checklist @tools/visualqa/checklists/mobile/layout.md
+
+# everything for a device
+--checklist @tools/visualqa/checklists/mobile/all.md
+```
+
+Groups: `layout`, `typography`, `navigation`, `forms`, `media`,
+`interactions`, `accessibility` (one file per device × group;
+`all.md` = the full device set). Each device is tuned to its form
+factor — mobile is touch/thumb/safe-area centric, tablet adds hybrid
+hover+touch and split-pane, desktop adds keyboard operation and
+window-resize behavior. A device `all.md` is 28 items, under the
+tool's 32-check response clamp.
+
 ### 4. Interpreting verdicts
 
 - **PASS** — the item clearly holds.

@@ -259,3 +259,36 @@ func asProviderError(err error, target **providerError) bool {
 	*target = pe
 	return true
 }
+
+func TestParseChecksClampsToMax(t *testing.T) {
+	// A 40-check response is clamped to maxChecksPerStep (32); a 30-check
+	// response survives whole (the device "all" checklists are 28 items).
+	build := func(n int) string {
+		var sb strings.Builder
+		sb.WriteString(`{"checks":[`)
+		for i := 0; i < n; i++ {
+			if i > 0 {
+				sb.WriteString(",")
+			}
+			fmt.Fprintf(&sb, `{"item":"item %d","verdict":"PASS","reason":"r"}`, i)
+		}
+		sb.WriteString("]}")
+		return sb.String()
+	}
+
+	got, err := parseChecks(build(40))
+	if err != nil {
+		t.Fatalf("parseChecks(40): %v", err)
+	}
+	if len(got) != maxChecksPerStep {
+		t.Errorf("len = %d, want clamp to %d", len(got), maxChecksPerStep)
+	}
+
+	got, err = parseChecks(build(30))
+	if err != nil {
+		t.Fatalf("parseChecks(30): %v", err)
+	}
+	if len(got) != 30 {
+		t.Errorf("len = %d, want 30 (no clamp under the cap)", len(got))
+	}
+}

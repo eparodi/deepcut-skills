@@ -16,6 +16,7 @@ Visual QA — drives headless Chrome via tools/visualqa with DeepSeek vision: on
   - [1. One-shot verification](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#1-one-shot-verification)
   - [2. Flow verification](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#2-flow-verification)
   - [3. Authoring a new feature or case (the JSON contract)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#3-authoring-a-new-feature-or-case-the-json-contract)
+  - [3b. Choosing a checklist (the library)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#3b-choosing-a-checklist-the-library)
   - [4. Interpreting verdicts](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#4-interpreting-verdicts)
 - [Guardrails](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#guardrails)
 - [Test Task](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#test-task)

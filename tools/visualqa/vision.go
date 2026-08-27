@@ -113,6 +113,10 @@ Checklist:
 
 const reaskSuffix = "\nYour previous response was invalid. Return ONLY the JSON object, no markdown, in this shape: {\"checks\":[{\"item\":\"...\",\"verdict\":\"PASS|FAIL|UNCERTAIN\",\"reason\":\"...\"}]}."
 
+// maxChecksPerStep caps the parsed response so a runaway model can't flood
+// the report; the device "all" checklists (28 items) fit comfortably.
+const maxChecksPerStep = 32
+
 // analyze sends one screenshot to the vision model and returns the parsed
 // checks. Malformed responses go through the ladder: local repair → one
 // re-ask → a single UNCERTAIN fallback (never a hard crash).
@@ -173,7 +177,7 @@ func (c *visionClient) chatOnce(ctx context.Context, png []byte, userText, syste
 			}},
 		},
 		ResponseFormat: responseFormat{Type: "json_object"},
-		MaxTokens:      1024,
+		MaxTokens:      2048,
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -276,8 +280,8 @@ func parseChecks(text string) ([]checkResult, error) {
 		c.Item = clampString(c.Item, 120)
 		c.Reason = clampString(c.Reason, 200)
 	}
-	if len(vr.Checks) > 24 {
-		vr.Checks = vr.Checks[:24]
+	if len(vr.Checks) > maxChecksPerStep {
+		vr.Checks = vr.Checks[:maxChecksPerStep]
 	}
 	return vr.Checks, nil
 }

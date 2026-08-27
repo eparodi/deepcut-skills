@@ -353,7 +353,7 @@ are pinned in a table test (no browser needed).
   }
   ```
   `verdict ∈ {PASS, FAIL, UNCERTAIN}` (enum check), `DisallowUnknownFields`,
-  item count clamped ≤ 24, reason ≤ 200 chars.
+  item count clamped ≤ 32, reason ≤ 200 chars.
 - **Reliability ladder (per call):** retry 429/500/503/network with
   backoff + full jitter honoring `Retry-After` (budget 3) → on
   malformed/empty JSON: one local repair (strip fences, first balanced
@@ -491,6 +491,17 @@ feature (VQ-2 keeps them apart later).
   before the first capture — `report.write` (which MkdirAlls) is
   deferred, so the first screenshot used to fail on a missing dir
   (found in the first smoke run).
+
+- **2026-08-26 (checklist library):** `tools/visualqa/checklists/`
+  added per-device checklists grouped by type (layout, typography,
+  navigation, forms, media, interactions, accessibility) derived from
+  ten verified sources (`docs/research/visual-qa-device-design-sources.md`:
+  Google web.dev, W3C WAI + WCAG 2.2 (pins the 24×24 CSS px target-size
+  number), NN/g, Smashing, CSS-Tricks, MDN, LukeW, A List Apart,
+  Baymard). Each device has group files + an `all.md` (28 items). The
+  vision-response clamp was raised 24 → 32 (and `max_tokens`
+  1024 → 2048) so a full device run fits; pinned by
+  `TestParseChecksClampsToMax`.
 
 ## Task Checklist (Phase 3)
 
