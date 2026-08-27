@@ -1,6 +1,6 @@
 # Visual QA: Browser Automation + DeepSeek Vision
 
-**Status:** Approved (requirements gate passed 2026-08-26; design below pending gate)
+**Status:** Approved (requirements gate 2026-08-26; design gate 2026-08-26)
 **Owner:** Eliseo
 **Created:** 2026-08-26
 
@@ -52,6 +52,9 @@ most important design target).
 5. **Repo layout — single module for v1.** One root `go.mod` hosts both
    `tools/wiki-gen` and `tools/visualqa`; `go test ./...` covers both.
    Splitting `tools/visualqa` into its own module is a follow-up (VQ-2).
+6. **Model is user-configurable.** Resolution order: `--model` flag >
+   `DEEPSEEK_VISION_MODEL` (process env, then `.env.visualqa`) >
+   default `deepseek-v4-flash-vision-exp`.
 
 ## Requirements
 
@@ -67,8 +70,8 @@ so I can catch rendering and layout issues that unit tests can't.
   `go run ./tools/visualqa --url <url> --device mobile`, Then a
   headless Chrome session launches with that device's emulation
   (viewport, user agent, touch, device scale factor), navigates to the
-  URL, waits for load, and captures a full-page screenshot saved under
-  `artifacts/visualqa/<run>/`.
+  URL, waits for load, and captures a viewport screenshot (the pixels
+  a user actually sees) saved under `artifacts/visualqa/<run>/`.
 - Given the captured screenshot, When it is sent to
   `deepseek-v4-flash-vision-exp` with the QA checklist prompt, Then
   the response parses into structured findings (per-check verdict
@@ -285,6 +288,14 @@ go run ./tools/visualqa \
 }
 ```
 
+**Captures are viewport-only in v1** — the vision model resizes every
+image to ~800×800 total pixels, so a tall full-page capture gets
+squished and loses the text detail mobile QA depends on. Below-fold
+content is covered with explicit `scroll` + `screenshot` steps.
+(Design refinement at the gate, 2026-08-26: US1 originally said
+"full-page"; corrected to viewport after checking the resize math
+against api-docs.deepseek.com.)
+
 **Actions** (the enum; anything else is a validation error):
 
 | action | fields | notes |
@@ -320,8 +331,9 @@ are pinned in a table test (no browser needed).
 
 ### Vision contract
 
-- **Model:** `deepseek-v4-flash-vision-exp` (overridable via
-  `--model`).
+- **Model:** user-configurable; resolution `--model` flag >
+  `DEEPSEEK_VISION_MODEL` (env, then `.env.visualqa`) > default
+  `deepseek-v4-flash-vision-exp`.
 - **Request:** one screenshot per call, PNG → base64 `data:` URL in a
   `user` message; image goes LAST, stable checklist prefix FIRST
   (KV-cache friendly, per ai-engineer discipline). `response_format:
@@ -443,3 +455,64 @@ the repo has no CI, so the browser path is verified by running it.
 
 No changes to the wiki tool or its stdlib-only property in this
 feature (VQ-2 keeps them apart later).
+
+## Task Checklist (Phase 3)
+
+1. [ ] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold
+   `tools/visualqa/`
+   → Verifies: `go build ./...` green with the wiki tool untouched
+   → Satisfies: repo layout (VQ-2 deferred)
+
+2. [ ] (Tooling) `device.go` + `device_test.go` — preset table
+   → Test: `TestDevicePresets` (mobile/tablet/desktop viewport, DPR,
+   touch) — red first
+   → Satisfies: US3 AC1
+
+3. [ ] (Tooling) `flow.go` + `flow_test.go` — schema + strict loader
+   → Tests: happy path; unknown action; unknown field; missing name;
+   empty steps; duplicate case names; relative URL resolution;
+   `--case` selection; unknown case name — red first
+   → Satisfies: US2 AC3, US6 AC1–AC2
+
+4. [ ] (Tooling) `vision.go` + `vision_test.go` — client vs an
+   `httptest` OpenAI-compatible fake
+   → Tests: success; JSON-mode empty content → repair; malformed →
+   repair → re-ask → UNCERTAIN; 429 → retry → success; 429 exhausted;
+   400 → no retry; 402 → fail with message; token usage recorded;
+   model resolution order (flag > env > file > default) — red first
+   → Satisfies: US1 AC2, US4 AC2–AC5
+
+5. [ ] (Tooling) `env.go` + `env_test.go` — `.env.visualqa` loader +
+   precedence (process env > file)
+   → Test: `TestEnvPrecedence` — red first
+   → Satisfies: US5 (key convention), decision 4/6
+
+6. [ ] (Tooling) `report.go` + `report_test.go` — `report.md` +
+   `findings.json`
+   → Tests: header fields; findings table; screenshot refs;
+   diagnostics section; JSON shape — red first
+   → Satisfies: US1 AC3, US2 AC4, US4 AC5
+
+7. [ ] (Tooling) `browser.go` + `main.go` — rod session, action
+   executor, event collection, orchestration, exit codes
+   → Test: pre-browser validation paths (bad flags / bad flow exit 2
+   without launching) — red first; live Chrome path exercised by the
+   Test Task (repo has no CI)
+   → Satisfies: US1 AC1, US2 AC1–AC2, US4 AC1
+
+8. [ ] (Config) `.gitignore` + `.env.visualqa.example` committed;
+   key/model loader wired
+   → Test: `TestEnvPrecedence` (task 5)
+   → Satisfies: decision 4/6, US5
+
+9. [ ] (Skill) `.agents/skills/visual-qa/SKILL.md` + `zed/profiles.json`
+   entry + `AGENT_INDEX.md` row + `wiki/catalog.json` entry;
+   regenerate the wiki
+   → Verifies: ruby YAML parse; `python3 -m json.tool`;
+   `go test ./...` green (catalog + wiki up-to-date checks)
+   → Satisfies: US5 AC1–AC2, US6 AC3
+
+10. [ ] (Live) Test Task: one-shot + a 2-case flow against a local
+    page on mobile; live vision round-trip with the real key
+    → Run by the operator (key lives in the gitignored `.env.visualqa`)
+    → Satisfies: US1/US2 end-to-end
