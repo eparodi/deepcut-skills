@@ -38,6 +38,7 @@ func run(args []string) int {
 	timeoutFlag := fs.Duration("timeout", 5*time.Minute, "per-run timeout")
 	retriesFlag := fs.Int("retries", 3, "vision-call retry budget for 429/500/503")
 	modelFlag := fs.String("model", "", "vision model (default deepseek-v4-flash-vision-exp)")
+	apiBaseFlag := fs.String("api-base", "https://api.deepseek.com", "OpenAI-compatible API base URL")
 	if err := fs.Parse(args); err != nil {
 		return exitValidation
 	}
@@ -115,7 +116,7 @@ func run(args []string) int {
 	}
 
 	vision := &visionClient{
-		baseURL: "https://api.deepseek.com",
+		baseURL: *apiBaseFlag,
 		apiKey:  key,
 		model:   model,
 		retries: *retriesFlag,
@@ -164,6 +165,10 @@ type executeParams struct {
 func execute(ctx context.Context, p executeParams) int {
 	runID := "run-" + time.Now().UTC().Format("20060102T150405Z")
 	dir := p.outRoot + "/" + runID
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "create run dir: %v\n", err)
+		return exitProvider
+	}
 
 	report := &runReport{
 		RunID:          runID,
@@ -189,8 +194,15 @@ func execute(ctx context.Context, p executeParams) int {
 		report.FailReason = "browser launch failed: " + err.Error()
 		return exitProvider
 	}
+	// LIFO defers: the report must be written before the (possibly slow)
+	// browser close runs, so a hanging close can never lose the report.
 	defer sess.close()
-	report.Diagnostics = append(report.Diagnostics, sess.diag...)
+	defer func() {
+		if err := report.write(dir); err != nil {
+			fmt.Fprintf(os.Stderr, "write report: %v\n", err)
+		}
+	}()
+	report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 
 	stepsRun := 0
 	shots := 0
@@ -209,7 +221,7 @@ func execute(ctx context.Context, p executeParams) int {
 				return exitBudget
 			}
 
-			label := describeStep(ec.name, i, step)
+			label := describeStep(i, step)
 			fmt.Fprintf(os.Stderr, "[%d/%d] %s\n", stepsRun, p.maxSteps, label)
 
 			res := stepResult{Case: ec.name, Step: label}
@@ -273,7 +285,7 @@ func execute(ctx context.Context, p executeParams) int {
 		}
 	}
 	report.Screenshots = shots
-	report.Diagnostics = append(report.Diagnostics, sess.diag...)
+	report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 
 	fmt.Fprintf(os.Stderr, "report: %s/report.md\n", dir)
 	return exitOK

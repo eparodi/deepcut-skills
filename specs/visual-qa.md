@@ -250,12 +250,17 @@ go run ./tools/visualqa \
   --device mobile|tablet|desktop \
   [--case <name>] \
   [--checklist <text|@file>] \
+  [--api-base https://api.deepseek.com] \
   [--out artifacts/visualqa] \
   [--max-steps 15] [--max-screenshots 12] \
   [--timeout 5m] [--retries 3] [--model deepseek-v4-flash-vision-exp]
 ```
 
 - `--url` and `--flow` are mutually exclusive (one-shot vs flow mode).
+- `--api-base` points at any OpenAI-compatible endpoint (default
+  `https://api.deepseek.com`); added at implementation time so the
+  tool can run against local proxies and test fakes (see Implementation
+  Notes).
 - One-shot mode synthesizes a single implicit case: `goto <url>` →
   `screenshot`.
 
@@ -456,25 +461,56 @@ the repo has no CI, so the browser path is verified by running it.
 No changes to the wiki tool or its stdlib-only property in this
 feature (VQ-2 keeps them apart later).
 
+## Implementation Notes
+
+- **2026-08-26 (rod version pin):** rod is pinned at **v0.114.8** — the
+  last release of the classic `Must*` API. v0.115.0 rewrote the API
+  (no `Must*` helpers) and v0.116.x moved the device package
+  (`lib/device` → `lib/devices`) — verified against the installed
+  module cache per skills-test AGENTS.md §10.4 before coding. Presets
+  used: `devices.IPhoneX` (375×812 @3) for mobile, `devices.IPad`
+  (768×1024 @2) for tablet; desktop is a plain
+  `MustSetViewport(1440, 900, 1, false)`.
+
+- **2026-08-26 (EachEvent stop pattern):** rod's `EachEvent` wait func
+  must be invoked EXACTLY ONCE (`go wait()`). Calling it a second time
+  to stop it joins the event loop and blocks forever (found via a
+  SIGQUIT goroutine dump during the live smoke test). The listener
+  terminates itself when the CDP connection closes, so `close()` just
+  closes the browser — bounded by a 5s watchdog so a Chrome that
+  won't shut down can never block the report write or process exit.
+
+- **2026-08-26 (`--api-base` added):** the CLI contract gained
+  `--api-base` (default `https://api.deepseek.com`) so the full
+  pipeline can run against a local OpenAI-compatible fake. The live
+  smoke test (headless Chrome → screenshot → fake vision → report)
+  completed with exit 0 on mobile, tablet, and desktop; the real
+  DeepSeek round-trip is the operator-run Test Task (task 10).
+
+- **2026-08-26 (run-dir creation):** the run directory must be created
+  before the first capture — `report.write` (which MkdirAlls) is
+  deferred, so the first screenshot used to fail on a missing dir
+  (found in the first smoke run).
+
 ## Task Checklist (Phase 3)
 
-1. [ ] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold
+1. [x] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold
    `tools/visualqa/`
    → Verifies: `go build ./...` green with the wiki tool untouched
    → Satisfies: repo layout (VQ-2 deferred)
 
-2. [ ] (Tooling) `device.go` + `device_test.go` — preset table
+2. [x] (Tooling) `device.go` + `device_test.go` — preset table
    → Test: `TestDevicePresets` (mobile/tablet/desktop viewport, DPR,
    touch) — red first
    → Satisfies: US3 AC1
 
-3. [ ] (Tooling) `flow.go` + `flow_test.go` — schema + strict loader
+3. [x] (Tooling) `flow.go` + `flow_test.go` — schema + strict loader
    → Tests: happy path; unknown action; unknown field; missing name;
    empty steps; duplicate case names; relative URL resolution;
    `--case` selection; unknown case name — red first
    → Satisfies: US2 AC3, US6 AC1–AC2
 
-4. [ ] (Tooling) `vision.go` + `vision_test.go` — client vs an
+4. [x] (Tooling) `vision.go` + `vision_test.go` — client vs an
    `httptest` OpenAI-compatible fake
    → Tests: success; JSON-mode empty content → repair; malformed →
    repair → re-ask → UNCERTAIN; 429 → retry → success; 429 exhausted;
@@ -482,30 +518,30 @@ feature (VQ-2 keeps them apart later).
    model resolution order (flag > env > file > default) — red first
    → Satisfies: US1 AC2, US4 AC2–AC5
 
-5. [ ] (Tooling) `env.go` + `env_test.go` — `.env.visualqa` loader +
+5. [x] (Tooling) `env.go` + `env_test.go` — `.env.visualqa` loader +
    precedence (process env > file)
    → Test: `TestEnvPrecedence` — red first
    → Satisfies: US5 (key convention), decision 4/6
 
-6. [ ] (Tooling) `report.go` + `report_test.go` — `report.md` +
+6. [x] (Tooling) `report.go` + `report_test.go` — `report.md` +
    `findings.json`
    → Tests: header fields; findings table; screenshot refs;
    diagnostics section; JSON shape — red first
    → Satisfies: US1 AC3, US2 AC4, US4 AC5
 
-7. [ ] (Tooling) `browser.go` + `main.go` — rod session, action
+7. [x] (Tooling) `browser.go` + `main.go` — rod session, action
    executor, event collection, orchestration, exit codes
    → Test: pre-browser validation paths (bad flags / bad flow exit 2
    without launching) — red first; live Chrome path exercised by the
-   Test Task (repo has no CI)
+   smoke test + Test Task (repo has no CI)
    → Satisfies: US1 AC1, US2 AC1–AC2, US4 AC1
 
-8. [ ] (Config) `.gitignore` + `.env.visualqa.example` committed;
+8. [x] (Config) `.gitignore` + `.env.visualqa.example` committed;
    key/model loader wired
    → Test: `TestEnvPrecedence` (task 5)
    → Satisfies: decision 4/6, US5
 
-9. [ ] (Skill) `.agents/skills/visual-qa/SKILL.md` + `zed/profiles.json`
+9. [x] (Skill) `.agents/skills/visual-qa/SKILL.md` + `zed/profiles.json`
    entry + `AGENT_INDEX.md` row + `wiki/catalog.json` entry;
    regenerate the wiki
    → Verifies: ruby YAML parse; `python3 -m json.tool`;
@@ -515,4 +551,6 @@ feature (VQ-2 keeps them apart later).
 10. [ ] (Live) Test Task: one-shot + a 2-case flow against a local
     page on mobile; live vision round-trip with the real key
     → Run by the operator (key lives in the gitignored `.env.visualqa`)
-    → Satisfies: US1/US2 end-to-end
+    → Satisfies: US1/US2 end-to-end. Browser half proven by the smoke
+    test (exit 0, mobile/tablet/desktop); the real DeepSeek
+    round-trip still needs the operator's key + network.
