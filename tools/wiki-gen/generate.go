@@ -62,8 +62,23 @@ type catalogEntry struct {
 	Notes    string   `json:"notes"`
 }
 
+// externalEntry catalogs a skill that lives only in another repo (not in
+// the hub). Its one-line description is mirrored in the manifest so
+// generation stays fully offline; the generated page links to the real
+// SKILL.md. The learning-porter keeps these descriptions in sync with
+// their sources.
+type externalEntry struct {
+	Category    string   `json:"category"`
+	Tags        []string `json:"tags"`
+	Notes       string   `json:"notes"`
+	Repo        string   `json:"repo"`
+	SourcePath  string   `json:"source_path"`
+	Description string   `json:"description"`
+}
+
 type catalog struct {
-	Skills map[string]catalogEntry `json:"skills"`
+	Skills  map[string]catalogEntry  `json:"skills"`
+	PerRepo map[string]externalEntry `json:"per_repo"`
 }
 
 // repoRoot returns the repository root by walking up from the working
@@ -252,8 +267,17 @@ func loadCatalog(path string) (catalog, error) {
 	return c, nil
 }
 
-// validateCatalog enforces the bidirectional manifest contract: every skill
-// dir must have an entry and every entry must resolve to a real skill.
+// repoBlobBases maps the sibling repos to their blob base URLs, used for
+// per-repo skill source links.
+var repoBlobBases = map[string]string{
+	"deepcut-binance-bot": "https://github.com/eparodi/deepcut-binance-bot/blob/main",
+	"deepcut-live":        "https://github.com/eparodi/deepcut-live/blob/main",
+}
+
+// validateCatalog enforces the manifest contracts: every hub skill dir must
+// have an entry and every entry must resolve; per-repo entries must be
+// well-formed (name, category, known repo, non-empty source/description)
+// and must not collide with hub skills.
 func validateCatalog(cat catalog, skills []skill) error {
 	have := make(map[string]bool, len(skills))
 	for _, s := range skills {
@@ -267,6 +291,23 @@ func validateCatalog(cat catalog, skills []skill) error {
 	for _, s := range skills {
 		if _, ok := cat.Skills[s.Name]; !ok {
 			return fmt.Errorf("catalog: skill %q has no catalog entry (add it to %s)", s.Name, catalogRel)
+		}
+	}
+	for name, e := range cat.PerRepo {
+		if strings.TrimSpace(name) == "" || strings.ContainsAny(name, " \t/") {
+			return fmt.Errorf("catalog: per-repo entry %q has an invalid name", name)
+		}
+		if have[name] {
+			return fmt.Errorf("catalog: per-repo skill %q collides with a hub skill", name)
+		}
+		if _, ok := categoryDisplay[e.Category]; !ok {
+			return fmt.Errorf("catalog: per-repo skill %q has invalid category %q", name, e.Category)
+		}
+		if _, ok := repoBlobBases[e.Repo]; !ok {
+			return fmt.Errorf("catalog: per-repo skill %q has unknown repo %q", name, e.Repo)
+		}
+		if e.SourcePath == "" || e.Description == "" {
+			return fmt.Errorf("catalog: per-repo skill %q needs source_path and description", name)
 		}
 	}
 	return nil
@@ -303,6 +344,24 @@ func renderHome(skills []skill, cat catalog) string {
 		b.WriteString("|---|---|---|\n")
 		for _, s := range group {
 			fmt.Fprintf(&b, "| `%s` | %s | [%s](%s) |\n", s.Name, escCell(s.Description), s.Name, s.Name)
+		}
+		b.WriteString("\n")
+	}
+
+	// Per-repo skills (live only in their own repository).
+	names := make([]string, 0, len(cat.PerRepo))
+	for name := range cat.PerRepo {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) > 0 {
+		fmt.Fprintf(&b, "## Per-repo skills (%d)\n\n", len(names))
+		b.WriteString("Skills that live only in their own repository; the hub carries catalog metadata and links to the real SKILL.md.\n\n")
+		b.WriteString("| Skill | Description | Page |\n")
+		b.WriteString("|---|---|---|\n")
+		for _, name := range names {
+			e := cat.PerRepo[name]
+			fmt.Fprintf(&b, "| `%s` | %s | [%s](%s) |\n", name, escCell(e.Description), name, name)
 		}
 		b.WriteString("\n")
 	}
@@ -347,6 +406,28 @@ func renderSkillPage(s skill, e catalogEntry) string {
 	return b.String()
 }
 
+// renderExternalPage renders the page for a per-repo skill: catalog
+// metadata + a source link to the real SKILL.md in its own repository.
+func renderExternalPage(name string, e externalEntry) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", name)
+	b.WriteString(markerBlock("`wiki/catalog.json` (per-repo skill)"))
+	fmt.Fprintf(&b, "\n> Source: [SKILL.md](%s/%s)\n\n", repoBlobBases[e.Repo], e.SourcePath)
+
+	b.WriteString(e.Description + "\n\n")
+
+	meta := "**Category:** " + e.Category
+	if len(e.Tags) > 0 {
+		meta += " · **Tags:** " + strings.Join(e.Tags, ", ")
+	}
+	meta += " · **Repo:** " + e.Repo
+	if e.Notes != "" {
+		meta += " · **Notes:** " + e.Notes
+	}
+	b.WriteString(meta + "\n")
+	return b.String()
+}
+
 // renderSidebar renders the GitHub-wiki sidebar (category-grouped links).
 func renderSidebar(skills []skill, cat catalog) string {
 	var b strings.Builder
@@ -365,6 +446,19 @@ func renderSidebar(skills []skill, cat catalog) string {
 		fmt.Fprintf(&b, "**%s**\n", categoryDisplay[category])
 		for _, s := range group {
 			fmt.Fprintf(&b, "- [%s](%s)\n", s.Name, s.Name)
+		}
+		b.WriteString("\n")
+	}
+
+	names := make([]string, 0, len(cat.PerRepo))
+	for name := range cat.PerRepo {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) > 0 {
+		fmt.Fprintf(&b, "**Per-repo skills**\n")
+		for _, name := range names {
+			fmt.Fprintf(&b, "- [%s](%s)\n", name, name)
 		}
 		b.WriteString("\n")
 	}
@@ -393,6 +487,9 @@ func generate(skillsDir, catalogPath, outDir string) error {
 	}
 	for _, s := range skills {
 		files[s.Name+".md"] = renderSkillPage(s, cat.Skills[s.Name])
+	}
+	for name, e := range cat.PerRepo {
+		files[name+".md"] = renderExternalPage(name, e)
 	}
 
 	names := make([]string, 0, len(files))

@@ -27,3 +27,9 @@
 **Process skills**
 - [spec-driven](spec-driven)
 
+**Per-repo skills**
+- [bot-engineer](bot-engineer)
+- [deepcut-platform](deepcut-platform)
+- [go-bot](go-bot)
+- [ui-engineer](ui-engineer)
+

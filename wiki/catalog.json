@@ -19,5 +19,39 @@
     "skill-factory":     { "category": "role", "tags": ["meta", "skills"], "notes": "hub only" },
     "spec-driven":       { "category": "process", "tags": ["workflow"], "notes": "" },
     "ux-designer":       { "category": "role", "tags": ["design", "ui"], "notes": "" }
+  },
+  "per_repo": {
+    "bot-engineer": {
+      "category": "role",
+      "tags": ["go", "trading"],
+      "notes": "per-repo copy: deepcut-binance-bot",
+      "repo": "deepcut-binance-bot",
+      "source_path": ".agents/skills/bot-engineer/SKILL.md",
+      "description": "Bot Engineer — owns all Go implementation in the deepcut-binance-bot repository (single-binary trading bot). Implements specs one task at a time, test-first. Never changes the spec's contracts unilaterally."
+    },
+    "ui-engineer": {
+      "category": "role",
+      "tags": ["dashboard", "ui"],
+      "notes": "per-repo copy: deepcut-binance-bot",
+      "repo": "deepcut-binance-bot",
+      "source_path": ".agents/skills/ui-engineer/SKILL.md",
+      "description": "UI Engineer — owns the bot dashboard frontend: Go html/template pages in internal/dashboard, the folder-per-component stylesheet/script registry (components/ + foundation.css), and the vanilla-JS enhancement layer. Load for any HTML/CSS/JS work in the dashboard."
+    },
+    "go-bot": {
+      "category": "stack",
+      "tags": ["go", "trading"],
+      "notes": "per-repo copy: deepcut-binance-bot",
+      "repo": "deepcut-binance-bot",
+      "source_path": ".agents/skills/go-bot/SKILL.md",
+      "description": "Go standards for the DeepCut trading bot — package layout, slog logging, error handling, ticker/concurrency, BoltDB, Binance/DeepSeek HTTP clients, risk guards, testing, and common AI traps. Load when writing Go code in this repo."
+    },
+    "deepcut-platform": {
+      "category": "stack",
+      "tags": ["media", "streaming"],
+      "notes": "per-repo copy: deepcut-live",
+      "repo": "deepcut-live",
+      "source_path": ".agents/skills/deepcut-platform/SKILL.md",
+      "description": "DeepCut Live project-specific integration notes — SRS media server, River job queue, hexagonal module layout, HLS/recording paths, and platform env vars. Load when working on streaming, recording, VOD, chat, or infrastructure code in THIS repo."
+    }
   }
 }
