@@ -25,13 +25,14 @@ The agent skills of the deepcut-skills hub, cataloged from their SKILL.md files.
 | `skill-factory` | Skill Factory — creates super-specific agent skills from recurring evidence, gated, deduped, YAML-validated, and human-approved. Never speculative. | [skill-factory](skill-factory) |
 | `ux-designer` | UX Designer — research-driven owner of UI design: screens, design system, spacing, responsive behavior, accessibility, and UX copy. Grounds every decision in documented principles from major design systems (NN/g, Apple HIG, Material, WCAG, Laws of UX). Coordinates with the Architect on the API/UI boundary. Never writes implementation code. | [ux-designer](ux-designer) |
 
-## Stack skills (3)
+## Stack skills (4)
 
 | Skill | Description | Page |
 |---|---|---|
 | `expo` | Expo/React Native (managed workflow) development standards — project layout, Expo Router, platform-specific patterns, testing, and managed workflow boundaries. Load when writing React Native code in the mobile/ directory. | [expo](expo) |
 | `go-chi` | Go/chi backend development standards — layering, error handling, concurrency, state management, testing, database patterns, and common AI traps. Load when writing Go code in the backend/ directory. | [go-chi](go-chi) |
 | `nextjs` | Next.js App Router development standards — Server Components, data fetching, route handlers, caching, layout patterns, and platform-specific AI traps. Load when writing TypeScript/React code in the frontend/ directory. | [nextjs](nextjs) |
+| `visual-qa` | Visual QA — drives headless Chrome via tools/visualqa with DeepSeek vision: one-shot page verification, multi-case flow JSON authoring, and report interpretation across mobile/tablet/desktop viewports. Load when a QA session needs to verify rendered UI states or author visual-QA flows. | [visual-qa](visual-qa) |
 
 ## Process skills (1)
 

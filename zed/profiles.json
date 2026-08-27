@@ -300,8 +300,27 @@
         "heavy": "",
         "reasoning": "Owns Postgres migration mechanics, the store/query layer, data integrity, and test-DB strategy. Reviews the Architect's data model for mechanical safety, never designs tables. Pro by default: migrations and destructive schema changes are hard to reverse."
       }
+    },
+    "visual-qa": {
+      "display_name": "Visual QA (DeepSeek Vision)",
+      "skills": ["visual-qa"],
+      "tools": {
+        "read_file": true,
+        "grep": true,
+        "find_path": true,
+        "list_directory": true,
+        "write_file": true,
+        "edit_file": true,
+        "terminal": true,
+        "fetch": false
+      },
+      "model": {
+        "default": "deepseek-v4-flash",
+        "heavy": "deepseek-v4-pro",
+        "reasoning": "Runs the visual-QA tool (headless Chrome + DeepSeek vision): executes flows, authors flow JSON, interprets reports. Flash for routine runs; escalate to Pro when interpreting ambiguous visual verdicts or debugging a failing run."
+      }
     }
   },
-  "version": "1.5.0",
-  "last_updated": "2026-08-15"
+  "version": "1.6.0",
+  "last_updated": "2026-08-26"
 }
