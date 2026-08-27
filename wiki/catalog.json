@@ -1,0 +1,23 @@
+{
+  "skills": {
+    "ai-engineer":       { "category": "role", "tags": ["llm", "deepseek"], "notes": "" },
+    "architect":         { "category": "role", "tags": ["design"], "notes": "" },
+    "backend-engineer":  { "category": "role", "tags": ["go", "backend"], "notes": "" },
+    "db-analyst":        { "category": "role", "tags": ["postgres", "data"], "notes": "" },
+    "expo":              { "category": "stack", "tags": ["expo", "mobile"], "notes": "" },
+    "financial-analyst": { "category": "role", "tags": ["risk", "money"], "notes": "" },
+    "frontend-engineer": { "category": "role", "tags": ["nextjs", "frontend"], "notes": "" },
+    "go-chi":            { "category": "stack", "tags": ["go", "backend"], "notes": "" },
+    "learning-porter":   { "category": "role", "tags": ["meta", "learnings"], "notes": "hub only" },
+    "mobile-engineer":   { "category": "role", "tags": ["expo", "mobile"], "notes": "" },
+    "nextjs":            { "category": "stack", "tags": ["nextjs", "frontend"], "notes": "" },
+    "orchestrator":      { "category": "role", "tags": ["workflow", "automation"], "notes": "" },
+    "pm":                { "category": "role", "tags": ["planning", "process"], "notes": "" },
+    "qa":                { "category": "role", "tags": ["testing"], "notes": "" },
+    "reviewer":          { "category": "role", "tags": ["review"], "notes": "" },
+    "security-engineer": { "category": "role", "tags": ["security"], "notes": "" },
+    "skill-factory":     { "category": "role", "tags": ["meta", "skills"], "notes": "hub only" },
+    "spec-driven":       { "category": "process", "tags": ["workflow"], "notes": "" },
+    "ux-designer":       { "category": "role", "tags": ["design", "ui"], "notes": "" }
+  }
+}

@@ -1,0 +1,60 @@
+# nextjs
+
+> **Generated** from `.agents/skills/nextjs/SKILL.md` — do not edit by hand.
+> Source: [SKILL.md](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md)
+
+Next.js App Router development standards — Server Components, data fetching, route handlers, caching, layout patterns, and platform-specific AI traps. Load when writing TypeScript/React code in the frontend/ directory.
+
+**Category:** stack · **Tags:** nextjs, frontend
+
+## Sections
+
+- [Project Layout (Monorepo)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#project-layout-monorepo)
+  - [`.nvmrc` — pin Node version](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#nvmrc--pin-node-version)
+- [Server Components by DEFAULT](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#server-components-by-default)
+  - [Rule: Never add `"use client"` unless you have to](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#rule-never-add-use-client-unless-you-have-to)
+  - [DO — Data fetching in Server Components](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--data-fetching-in-server-components)
+  - [DO — Pass data from Server to Client Component](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--pass-data-from-server-to-client-component)
+  - [DO NOT — Common Server/Client mistakes](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--common-serverclient-mistakes)
+- [Data Fetching Decision Tree](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#data-fetching-decision-tree)
+  - [DO — Server Action with useActionState](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--server-action-with-useactionstate)
+  - [DO NOT — useActionState mistakes](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--useactionstate-mistakes)
+- [Route Handlers](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#route-handlers)
+  - [DO — Standard REST route handler](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--standard-rest-route-handler)
+  - [DO — Dynamic route with params (Next.js 15+)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--dynamic-route-with-params-nextjs-15)
+  - [DO NOT — Route handler mistakes](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--route-handler-mistakes)
+- [Layout / Page / Template Hierarchy](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#layout--page--template-hierarchy)
+  - [DO — Nested layouts](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--nested-layouts)
+  - [DO — Loading, error, not-found](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--loading-error-not-found)
+  - [DO NOT — Layout mistakes](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--layout-mistakes)
+- [Caching Traps (Next.js 15 Changed Defaults)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#caching-traps-nextjs-15-changed-defaults)
+  - [DO NOT — Assume caching is still automatic](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--assume-caching-is-still-automatic)
+  - [DO — Explicit caching](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--explicit-caching)
+  - [DO — Explicit dynamic behavior](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--explicit-dynamic-behavior)
+- [Metadata](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#metadata)
+  - [DO — Static and dynamic metadata](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--static-and-dynamic-metadata)
+  - [DO NOT — Metadata mistakes](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--metadata-mistakes)
+- [Suspense & useSearchParams](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#suspense--usesearchparams)
+- [Middleware](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#middleware)
+  - [DO — Edge-compatible middleware](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--edge-compatible-middleware)
+  - [DO NOT — Middleware edge runtime traps](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--middleware-edge-runtime-traps)
+- [Common AI Hallucinations — Complete Reference](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#common-ai-hallucinations--complete-reference)
+  - [Fake Next.js APIs](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#fake-nextjs-apis)
+  - ["use client" / "use server" Fabrications](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#use-client--use-server-fabrications)
+  - [Import Traps](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#import-traps)
+- [API Layer Discipline](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#api-layer-discipline)
+- [WebSocket / Effect Lifecycle](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#websocket--effect-lifecycle)
+- [Fetch Races (AbortController)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#fetch-races-abortcontroller)
+- [Component Patterns & Anti-Patterns](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#component-patterns--anti-patterns)
+  - [DO — Extract duplicated components and helpers](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--extract-duplicated-components-and-helpers)
+  - [DO — img onError fallbacks](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--img-onerror-fallbacks)
+  - [DO — Derive, don't duplicate, state](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--derive-dont-duplicate-state)
+  - [DO NOT — Module-level mutable state](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--module-level-mutable-state)
+  - [DO NOT — Inline style objects when Tailwind classes exist](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--inline-style-objects-when-tailwind-classes-exist)
+  - [DO NOT — Use viewport units for component-internal layout changes](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do-not--use-viewport-units-for-component-internal-layout-changes)
+  - [DO — Stop both onClick and onDoubleClick on controls inside clickable parents](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#do--stop-both-onclick-and-ondoubleclick-on-controls-inside-clickable-parents)
+  - [Testing — vi.mock and class exports](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#testing--vimock-and-class-exports)
+  - [Pre-Deploy Checklist](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#pre-deploy-checklist)
+  - [React Patterns — `useRef` vs `useState`](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#react-patterns--useref-vs-usestate)
+  - [ESLint — underscore-prefix does NOT suppress unused-vars](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/nextjs/SKILL.md#eslint--underscore-prefix-does-not-suppress-unused-vars)
+
