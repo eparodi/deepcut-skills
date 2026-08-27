@@ -389,7 +389,7 @@ At the end of a feature or session:
 
 ---
 
-*Last updated: 2026-08-18*
+*Last updated: 2026-08-27*
 *These rules apply to all agent threads in this project.*
 
 ---
@@ -894,3 +894,39 @@ the next call (`UNSUPPORTED_CONTENT`)** — visual QA must render to a
 FILE and pass plain-text references to it (2026-08-21:
 `browser_screenshot` crashed a QA session twice; the file-based
 pipeline recovered it).
+
+### 10.46 Time-Window Boundaries Derive From the Enforced Grid and Carry a Full Step of Latency Margin
+
+**A "next boundary" window can be 1 second away from the entity it
+must exclude — not a full interval** (2026-08-27: a trading bot's
+`ExitCycle` is the closed candle's LAST second (`CloseTime/1000 =
+open+899`), so a window opening at the next boundary still contained
+the close's own fills and double-booked the ledger when a manual sell
+also existed). Rules: (1) derive the step from a VALIDATED constant
+(the candle grid pinned by config validation), never a free config
+knob; (2) open the window a full step past the entity's interval so
+processing/fill latency is covered; (3) re-derive timestamp semantics
+from code + real payload shape before trusting a review's boundary
+assumptions.
+
+### 10.47 Fakes for Server-Side-Filtered Endpoints Must Honor the Filter Params
+
+**A fake that returns every record regardless of the query's
+`startTime`/`endTime` silently bypasses the very windowing the code
+under test implements** (2026-08-27: a reconcile fake served all
+trades with a stub timestamp, so the double-booking window was never
+exercised). If the real service filters server-side, the fake must
+parse the filter params and apply them inclusively — otherwise the
+test proves nothing about the window (extends §10.25, which is about
+fakes ADVANCING their own time state; this is about honoring the
+client's requested window).
+
+### 10.48 Prefer Exclusion-by-Construction Over a Stateful Skip-Budget When Reconciling a Stream Against a Ledger
+
+**A per-consumer qty budget for skipping already-recorded stream
+items double-books when fills interleave** (2026-08-27: a reconcile's
+skipQty budget reset per record and a positional head-skip booked the
+bot's own TP fill twice). Filtering the SOURCE (open the stream past
+the last recorded item) is stronger than maintaining shared skip
+state across consumers — state resets, positionals mis-book, and the
+same item can be allocated twice.
