@@ -222,6 +222,17 @@ never leak). Omitted when the skill has no `##` headings.
   `process-2` and `review-gate`/`review-gate-1`). Pinned by
   `TestSlugify`, `TestSectionsSkipCodeBlocks`, `TestNoTemplateLeak`.
 
+- **2026-08-26 (post-merge follow-up, DP-2):** the catalog now covers the
+  per-repo-only skills (`bot-engineer`, `ui-engineer`, `go-bot`,
+  `deepcut-platform`) via a `per_repo` manifest section. Rationale: hub
+  copies would carry repo-specific references, violating §10.48 (hub free
+  of external project references), and scanning sibling worktrees would
+  break the offline stale-check. Instead the manifest mirrors each skill's
+  one-line description (copied exactly from the source frontmatter at
+  write time), validates name/category/repo/source-path offline, and each
+  generated page links to the real SKILL.md blob in its own repo. The
+  learning-porter owns keeping the mirrored descriptions in sync.
+
 ## Task Checklist (Phase 3)
 
 1. [x] (Tooling) Scaffold `go.mod`; write `tools/wiki-gen/generate_test.go`
