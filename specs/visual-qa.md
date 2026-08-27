@@ -1,6 +1,6 @@
 # Visual QA: Browser Automation + DeepSeek Vision
 
-**Status:** Draft
+**Status:** Approved (requirements gate passed 2026-08-26; design below pending gate)
 **Owner:** Eliseo
 **Created:** 2026-08-26
 
@@ -18,7 +18,8 @@ Completions format (verified against api-docs.deepseek.com, 2026-08-26):
   tokens per image**) — a full-page mobile screenshot costs ≤ 384
   vision tokens.
 - Optional `detail` field: `low` downscales to 512×512 (faster/cheaper
-  when fine detail doesn't matter).
+  when fine detail doesn't matter); default (`auto`) keeps ~800×800 —
+  the right trade for reading UI text.
 
 The hub repo already carries a hard-won lesson (skills-test AGENTS.md
 §10.45): *text-only* models can't consume screenshots — visual QA had
@@ -32,6 +33,25 @@ screenshots at scripted points in a flow, sends them to the vision
 model with a QA checklist, and produces a structured report — with
 device emulation for desktop, tablet, and mobile (mobile first, as the
 most important design target).
+
+## Resolved Decisions (requirements gate, 2026-08-26)
+
+1. **Interaction model — v1 is scripted flows + per-step vision
+   verification.** The vision-driven autonomous loop (model picks the
+   next action from the screenshot) is an explicit follow-up (VQ-1).
+2. **Browser automation dependency — approved.** `github.com/go-rod/rod`
+   (CDP client with built-in device presets). The repo is currently
+   stdlib-only; this is the one new dependency. Needs network for
+   `go get` and a local Chrome/Chromium at run time.
+3. **Budget defaults — approved.** `--max-steps 15`, `--max-screenshots
+   12`, per-run timeout 5m, retry budget 3.
+4. **API key — repo root.** `DEEPSEEK_API_KEY` read from a gitignored
+   `.env.visualqa` in the repo root; the `DEEPSEEK_API_KEY` environment
+   variable takes precedence. The key goes ONLY in the Authorization
+   header — never in prompts, logs, or reports.
+5. **Repo layout — single module for v1.** One root `go.mod` hosts both
+   `tools/wiki-gen` and `tools/visualqa`; `go test ./...` covers both.
+   Splitting `tools/visualqa` into its own module is a follow-up (VQ-2).
 
 ## Requirements
 
@@ -65,9 +85,10 @@ scroll → wait → screenshot) and verify each step visually, so I can QA
 interactions, not just a landing page.
 
 **Acceptance Criteria:**
-- Given a flow file (`--flow flows/<name>.json`), When the tool runs,
-  Then it executes the steps in order and captures a screenshot at
-  every step marked `"capture": true`.
+- Given a flow file (`--flow flows/<feature>.json`), When the tool
+  runs, Then it executes the steps in order and captures a screenshot
+  at every step marked `"capture": true` and at every explicit
+  `screenshot` step.
 - Given a step that fails to locate its target element, When the tool
   runs, Then it records the step as FAILED with the CDP error, aborts
   the remaining steps (fail-fast), and includes the failure in the
@@ -75,6 +96,10 @@ interactions, not just a landing page.
 - Given a flow file with an unknown action or malformed JSON, When the
   tool runs, Then it exits non-zero with a validation error naming the
   step, **without** launching a browser.
+- Given console errors or failed network requests during a run, When
+  the run completes, Then they appear in the report under a
+  Diagnostics section (captured from CDP events — this is the
+  "interacting with the browser using events" part).
 
 ### User Story 3: Desktop / tablet / mobile presets
 
@@ -84,8 +109,8 @@ flag so the same flow runs across device classes.
 **Acceptance Criteria:**
 - Given `--device desktop|tablet|mobile`, When the tool runs, Then the
   browser emulates the corresponding profile (mobile: phone viewport +
-  touch + UA; tablet: tablet viewport + touch; desktop: default
-  desktop viewport) and the report records the profile used.
+  touch + UA; tablet: tablet viewport + touch; desktop: desktop
+  viewport, no touch) and the report records the profile used.
 - Given a flow file, When I run it once per device, Then each run
   produces its own run directory and report under
   `artifacts/visualqa/`.
@@ -113,6 +138,9 @@ model response can't burn tokens or hang.
   fences, extract the first balanced JSON object) and then one
   re-ask, and if still invalid marks the step UNCERTAIN and continues
   — a single flaky answer never hard-crashes the run.
+- Given a run, When it completes, Then the report records the
+  screenshots taken and vision tokens used per step, so cost is
+  visible.
 
 ### User Story 5: Skill integration
 
@@ -129,33 +157,289 @@ QA session can use it consistently.
   to install/run the tool, the device presets, the flow-file format,
   the API-key convention, and how to read the report.
 
+### User Story 6: Feature & case authoring in the flow JSON
+
+As a QA engineer, I want a documented flow-file schema that holds one
+feature with MULTIPLE named cases, validated strictly, so adding a new
+feature or a new case is a consistent, rule-enforced JSON edit.
+
+**Acceptance Criteria:**
+- Given the flow schema, When a file declares `feature`, `base_url`,
+  and `cases` (1..N, each with a `name` and ordered `steps`), Then it
+  loads and runs each case in order — or exactly one case when
+  `--case <name>` is given.
+- Given a flow file with an unknown action, an unknown field, a
+  missing name, or empty steps, When the tool runs, Then it exits
+  non-zero naming the offending case/step, without launching a
+  browser. (The strict validator IS the rule — unknown additions
+  cannot silently load.)
+- Given the `visual-qa` skill, When an agent needs to QA a new
+  feature, Then the skill documents the schema, a working example,
+  and the convention: one feature per file, one case per scenario,
+  relative URLs resolved against `base_url`.
+
 ## Non-Goals
 
 - ❌ Real-device or emulator testing (physical phones/tablets are
   outside Zed; headless emulation only).
 - ❌ Cross-browser matrix — v1 drives Chrome/Chromium only.
 - ❌ Pixel-diff / golden-image comparison — verdicts are LLM-based in
-  v1 (a future `--diff` mode could compare two runs byte-wise).
+  v1 (a future `--diff` mode could compare two runs byte-wise; VQ-3).
 - ❌ Autonomous exploration loops in v1 — the model never chooses its
-  own next action (see Open Questions; candidate for v2).
-- ❌ CI wiring — the tool runs locally on demand; CI integration is a
-  follow-up.
+  own next action (VQ-1).
+- ❌ CI wiring — the tool runs locally on demand (VQ-4).
 - ❌ Fixing what it finds — the tool reports; a human or another agent
   fixes.
 - ❌ Running the repo's test suites — that stays QA's manual step.
+- ❌ Multi-project repo restructure in v1 — single module for now
+  (VQ-2).
 
-## Open Questions
+## Follow-ups (recorded, not in v1)
 
-- [NEEDS CLARIFICATION: interaction model — v1 ships scripted flows
-  with per-step vision verification. Do you also want the
-  vision-driven loop (model picks the next action from the
-  screenshot) in v1, or as a follow-up?]
-- [NEEDS CLARIFICATION: the tool needs a Go browser-automation
-  dependency (recommended `github.com/go-rod/rod`; alternative
-  `github.com/chromedp/chromedp`) — the repo is currently
-  stdlib-only. OK to add one?]
-- [NEEDS CLARIFICATION: default budget numbers — max-steps 15 /
-  max-screenshots 12 / 5m timeout / 3 retries. Acceptable defaults?]
-- [NEEDS CLARIFICATION: API key — `DEEPSEEK_API_KEY` read from a
-  gitignored `.env.visualqa` in the repo root (also honors the
-  `DEEPSEEK_API_KEY` environment variable). OK?]
+- **VQ-1** Vision-driven autonomous loop: model picks the next action
+  from the screenshot (needs a bounded action vocabulary + loop
+  budget before it can ship).
+- **VQ-2** Multi-project split: give `tools/visualqa` its own `go.mod`
+  so the wiki tool's dependency tree stays rod-free.
+- **VQ-3** `--diff` pixel/byte comparison between two runs.
+- **VQ-4** CI wiring for the visual-qa tool.
+
+---
+
+## Design (Phase 2 — pending gate)
+
+### Architecture
+
+**Technology:** Go CLI at `tools/visualqa/` (module `deepcut-skills`,
+one new dependency `github.com/go-rod/rod`). Rod launches a local
+Chrome/Chromium headlessly, applies a device preset, drives actions,
+captures screenshots, and exposes CDP events (console, network) for
+the Diagnostics section. A thin DeepSeek vision client (OpenAI-
+compatible `POST /chat/completions`) sends each screenshot with the QA
+checklist and parses a structured verdict.
+
+**Files**
+
+| Path | Purpose |
+|------|---------|
+| `tools/visualqa/main.go` | CLI: flags, mode selection (one-shot vs flow), orchestration, exit codes |
+| `tools/visualqa/device.go` | Device preset table (mobile/tablet/desktop: viewport, DPR, touch, UA) — pure data |
+| `tools/visualqa/flow.go` | Flow schema types + strict loader (`DisallowUnknownFields`, action enum, per-case validation) |
+| `tools/visualqa/vision.go` | Vision client: base64 image in a user message, JSON mode, retry/backoff, repair → re-ask → UNCERTAIN, token logging |
+| `tools/visualqa/browser.go` | Rod session: launch, emulation, action executor, screenshot capture, console/network event collection |
+| `tools/visualqa/report.go` | `report.md` + `findings.json` writer |
+| `tools/visualqa/*_test.go` | Table-driven tests (offline; vision via `httptest` fake endpoint) |
+| `.env.visualqa` | Gitignored key file at repo root (`DEEPSEEK_API_KEY=...`) |
+| `.agents/skills/visual-qa/SKILL.md` | The skill (see Skill Design) |
+| `wiki/`, `AGENT_INDEX.md`, `zed/profiles.json`, `wiki/catalog.json` | Registry + generated catalog updates |
+
+`.gitignore` additions: `.env.visualqa`, `artifacts/`.
+
+**Exit codes:** `0` = run completed and report written (FAIL findings
+are findings, not tool failures); `2` = usage/flow validation error;
+`3` = provider failure after retry budget; `4` = budget/timeout abort.
+
+### CLI contract
+
+```
+go run ./tools/visualqa \
+  --url <url> | --flow <feature.json> \
+  --device mobile|tablet|desktop \
+  [--case <name>] \
+  [--checklist <text|@file>] \
+  [--out artifacts/visualqa] \
+  [--max-steps 15] [--max-screenshots 12] \
+  [--timeout 5m] [--retries 3] [--model deepseek-v4-flash-vision-exp]
+```
+
+- `--url` and `--flow` are mutually exclusive (one-shot vs flow mode).
+- One-shot mode synthesizes a single implicit case: `goto <url>` →
+  `screenshot`.
+
+### Flow schema (the authoring contract)
+
+```json
+{
+  "feature": "checkout",
+  "base_url": "http://localhost:3000",
+  "cases": [
+    {
+      "name": "happy path",
+      "steps": [
+        { "action": "goto", "url": "/cart" },
+        { "action": "screenshot", "name": "cart-empty" },
+        { "action": "click", "selector": "#add-to-cart", "capture": true },
+        { "action": "wait", "ms": 800 },
+        { "action": "screenshot", "name": "cart-filled" },
+        { "action": "scroll", "to": "bottom", "capture": true }
+      ]
+    },
+    {
+      "name": "empty cart guard",
+      "steps": [
+        { "action": "goto", "url": "/checkout" },
+        { "action": "screenshot", "name": "guard" }
+      ]
+    }
+  ]
+}
+```
+
+**Actions** (the enum; anything else is a validation error):
+
+| action | fields | notes |
+|--------|--------|-------|
+| `goto` | `url` (relative → resolved against `base_url`) | navigation |
+| `click` | `selector`, `capture?` | first match; step FAILS if absent |
+| `type` | `selector`, `text`, `capture?` | fills an input |
+| `scroll` | `to: "top"\|"bottom"` **or** `selector`, `capture?` | |
+| `wait` | `ms` **or** `selector` | explicit settle |
+| `screenshot` | `name` (unique per case) | always captures |
+
+Validation rules (enforced by `flow.go`, pinned by tests):
+- Top level: `feature` (non-empty), `base_url` (valid http(s) URL),
+  `cases` (1..N).
+- Per case: `name` (non-empty, unique within the file), `steps` (≥1).
+- Per step: `action` in the enum; fields required per action;
+  unknown fields rejected (`DisallowUnknownFields`); `capture` only on
+  click/type/scroll.
+- Relative `goto` URLs resolve against `base_url`; absolute URLs pass
+  through.
+- `--case <name>` selects one case; unknown name = validation error.
+
+### Device presets
+
+| profile | viewport | DPR | touch | UA hint |
+|---------|----------|-----|-------|---------|
+| `mobile` | 390×844 | 3 | yes | iPhone-class Mobile Safari |
+| `tablet` | 820×1180 | 2 | yes | iPad-class Safari |
+| `desktop` | 1440×900 | 1 | no | Chrome desktop |
+
+Implemented as rod device presets; the exact viewport/DPR/touch values
+are pinned in a table test (no browser needed).
+
+### Vision contract
+
+- **Model:** `deepseek-v4-flash-vision-exp` (overridable via
+  `--model`).
+- **Request:** one screenshot per call, PNG → base64 `data:` URL in a
+  `user` message; image goes LAST, stable checklist prefix FIRST
+  (KV-cache friendly, per ai-engineer discipline). `response_format:
+  {"type": "json_object"}`, `max_tokens: 1024`.
+- **Response (strictly parsed):**
+  ```json
+  {
+    "checks": [
+      { "item": "no horizontal overflow", "verdict": "PASS", "reason": "..." },
+      { "item": "tap targets", "verdict": "FAIL", "reason": "bottom bar covers the primary CTA" }
+    ]
+  }
+  ```
+  `verdict ∈ {PASS, FAIL, UNCERTAIN}` (enum check), `DisallowUnknownFields`,
+  item count clamped ≤ 24, reason ≤ 200 chars.
+- **Reliability ladder (per call):** retry 429/500/503/network with
+  backoff + full jitter honoring `Retry-After` (budget 3) → on
+  malformed/empty JSON: one local repair (strip fences, first balanced
+  JSON object) → one re-ask → step marked UNCERTAIN. Never re-ask on
+  4xx; never retry 400/401/402/422. 402 = empty balance: fail the run
+  with the provider message.
+- **Cost:** ≤384 vision tokens/image → a full 12-screenshot run ≤
+  ~4.6K vision tokens + text. Per-call `prompt_tokens` logged and
+  summed in the report.
+
+**Default checklist (mobile-first; overridable via `--checklist`):**
+1. Content fits the viewport width — no horizontal overflow/clipping.
+2. Tap targets are large enough and don't overlap.
+3. Text is readable — no truncation, overlap, or poor contrast.
+4. Images/media load with visible fallbacks (no broken-image icons).
+5. Primary navigation and actions are reachable.
+6. Layout is intentional — no blank regions or misalignment.
+7. Fixed elements (headers/bottom bars) don't cover content.
+8. Nothing in the frame suggests rendering breakage.
+
+### Report format
+
+`artifacts/visualqa/<run>/` contains `report.md`, `findings.json`, and
+`s1.png`, `s2.png`, … (one per capture, named after the step).
+
+```
+# Visual QA Report — checkout
+Run: 20260826T1015Z-3f2a | Device: mobile | Model: deepseek-v4-flash-vision-exp
+URL/Flow: flows/checkout.json (base http://localhost:3000) | Date: ...
+Budget: 5/12 screenshots, 5/15 steps | Vision tokens: 1740 | Status: COMPLETED
+Summary: 6 PASS · 1 FAIL · 1 UNCERTAIN
+
+## Findings
+| # | Step | Check | Verdict | Reason |
+| 1 | happy path (cart-empty) | tap targets | FAIL | "bottom bar covers the primary CTA" |
+
+## Screenshots
+![cart-empty](s1.png)
+![cart-filled](s2.png)
+
+## Diagnostics
+- console error @ checkout.js:42 — "Uncaught TypeError: x is undefined"
+- failed request: GET /api/cart → 404
+```
+
+`findings.json` mirrors the data machine-readably: run id, device,
+url/flow, steps `[{name, screenshot, checks[]}]`, diagnostics,
+summary, budget, token usage. Fail-fast aborts and budget aborts mark
+the run `FAILED` with a reason in the header.
+
+### Skill design (`visual-qa`, category: stack)
+
+Created with the skill-factory template. `.agents/skills/visual-qa/
+SKILL.md`:
+
+- **What You Own:** running one-shot/flow visual QA, authoring flow
+  JSON (schema + validator), interpreting reports.
+- **What You Do NOT Own:** fixing findings, approving PRs, real-device
+  testing, autonomous loops.
+- **Workflow:** key setup (`.env.visualqa` at repo root) → build →
+  one-shot run → flow run → authoring a new feature/case (schema +
+  example + strict-validation rules + "one feature per file, one case
+  per scenario") → interpreting verdicts (UNCERTAIN = re-run or human
+  look; FAIL = file the finding).
+- **Guardrails:** budget flags are mandatory for interactive flows;
+  key only in the Authorization header (never in prompts/logs);
+  screenshots stay under `artifacts/` (gitignored — may contain
+  sensitive UI); no autonomous exploration (VQ-1).
+- **Test Task:** author a 2-case flow for a local URL, run one case on
+  mobile, produce a report, interpret it.
+
+**Profile** (`zed/profiles.json`, new entry `visual-qa`): Flash
+default / Pro heavy; tools read+grep+find+list+write+edit+terminal;
+skills `["visual-qa"]`. QA sessions load the skill alongside `qa`.
+
+**Registry updates:** `AGENT_INDEX.md` (stack-skills row),
+`wiki/catalog.json` (category `stack`, tags `qa, vision, browser`),
+then regenerate the wiki so `go test ./...` stays green.
+
+### Testing approach (test-first)
+
+Offline unit tests (no browser, no real API — no key needed):
+
+- `flow_test.go` — schema: happy path, unknown action, unknown field,
+  missing name, empty steps, duplicate case names, relative URL
+  resolution, `--case` selection, unknown case name. (Writes the
+  failing tests first.)
+- `vision_test.go` — against an `httptest` OpenAI-compatible fake:
+  success parse; JSON-mode empty content → repair; malformed → repair
+  → re-ask → UNCERTAIN; 429 → retry → success; 429 exhausted → run
+  fails; 400 → no retry; 402 → fail with message; token usage
+  recorded.
+- `device_test.go` — preset table pins (viewport/DPR/touch), no
+  browser.
+- `report_test.go` — `report.md` content pins (header fields, findings
+  table, screenshot refs, diagnostics section) + `findings.json`
+  shape.
+
+Live path (not unit-tested; exercised by the skill's Test Task): real
+Chrome launch, emulation, screenshots, one real vision round-trip —
+the repo has no CI, so the browser path is verified by running it.
+
+### Non-goal re-affirmed
+
+No changes to the wiki tool or its stdlib-only property in this
+feature (VQ-2 keeps them apart later).
