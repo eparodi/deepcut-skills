@@ -1,8 +1,13 @@
 # Agent Index
 
 > Canonical roster of every agent skill in the repos.
-> Last updated: 2026-08-15. Sources: `*/zed/profiles.json` (v1.4.0),
+> Last updated: 2026-08-26. Sources: `*/zed/profiles.json` (v1.5.0),
 > `*/.agents/skills/*/SKILL.md`.
+>
+> **Live catalog:** the generated wiki
+> (github.com/eparodi/deepcut-skills/wiki) renders every skill's
+> description, category, and section outline; this index keeps the
+> per-skill metadata the wiki doesn't generate (tiers, tools, placement).
 >
 > **Hub:** `skills-test/` holds the canonical copies + the two
 > meta-roles. Per-repo copies exist for workflow convenience and DO

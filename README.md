@@ -283,7 +283,9 @@ your-monorepo/
 
 ## Model Strategy
 
-Use DeepSeek-V4 for ~80% of work. Escalate to Claude Opus or GPT-4o when:
+DeepSeek-V4 **Flash** handles ~80% of work — the mechanical, reversible
+tasks (spec'd edits, builds/tests, grep/summarize, boilerplate).
+Escalate to DeepSeek-V4 **Pro** when:
 
 - Designing architecture (Architect role)
 - Making hard-to-reverse decisions (data model, auth strategy)
@@ -291,9 +293,12 @@ Use DeepSeek-V4 for ~80% of work. Escalate to Claude Opus or GPT-4o when:
 - Cross-cutting refactors or security-sensitive changes
 - Running security audits (Security Engineer role)
 - Reviewing PRs for subtle correctness issues (Reviewer role)
+- Skill design (skill-factory) and learning distillation (learning-porter)
 
-PM, UX Designer, Frontend, Mobile, and QA roles rarely need the stronger
-model.
+PM, UX Designer, Frontend, Mobile, and QA roles rarely need the Pro
+tier. The canonical routing table and escalation ladder live in
+`HOW_WE_WORK.md` → "Model Tier Routing" (also skills-test AGENTS.md
+§10.20).
 
 ## The Iteration Loop
 
