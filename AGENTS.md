@@ -951,3 +951,48 @@ qa/reviewer/security skills carrying hardcoded go/npm/docker commands
 and project ports). A process role discovers what the repo declares
 and loads the matching stack skill for the how; the one-liner lives
 exactly once, in the skill for that stack.
+
+### 10.50 Redirect Assertions Need the Unfollowed Status and Location
+
+**When a test asserts a redirect, the client's default behavior may
+follow it silently — "200" and "302" claims can both be wrong if the
+harness auto-follows** (2026-08-26: a `urllib`-based probe reported
+200 for every no-cookie request because the 302 → /login had already
+completed). Assert with a no-redirect transport/opener and check
+**both** the status (301/302) **and** the `Location` header; never
+infer a redirect from the final status alone.
+
+### 10.51 Assert Class Attributes by Full Value or Token, Never a `class=`-Prefix Substring
+
+**Asserting `class="card"` fails to match a rendered multi-class
+attribute `class="panel card"` even when the element is present — and
+can pass by accident when the target class is listed first**
+(2026-08-26: a probe for `class="prefs"` missed the rendered
+`class="panel prefs"`, misreporting a rendering bug that didn't
+exist). Assert the full attribute value, or match the token with
+boundaries (`class="[^"]*\btoken\b[^"]*"`); never rely on a
+`class=`-prefix substring.
+
+### 10.52 Behavior Changes Must Update the Tests Pinning the Superseded Contract
+
+**A feature that deliberately changes observable semantics fails
+every test that pinned the OLD behavior — a green suite before the
+change proves nothing about pin currency** (2026-08-26: a logout test
+still asserted server-side session revocation after the redesign made
+logout a cookie clear). When the change lands, grep the superseded
+contract's terms in tests (old sentinel values, status codes, response
+fields) and update those pins in the same change; then pin the new
+semantics explicitly.
+
+### 10.53 Time-Pinned Fixtures Need Now-Relative Anchors
+
+**A fixture that pins a computed output (a delta, a bucket, a day
+label) must anchor its time-dependent inputs at now-relative values —
+a fixed wall-clock anchor is in the future for part of every day, so
+the input falls outside a now-based range and the pinned output
+drifts silently across the day boundary** (2026-08-26: a "today at
+12:00 UTC" point dropped out of [today−30d, now] before noon,
+drifting a pinned +2.0% delta to +1.0%; extends the
+§10.14/§10.25 time-anchor family). Anchor with `now − offset` values
+that are always inside the range, or run the time-sensitive test on
+both sides of midnight UTC.
