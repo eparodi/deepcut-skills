@@ -1,4 +1,4 @@
-1. Controls meet WCAG 2.2 Target Size (Minimum): 24x24 CSS pixels, or spaced so a 24px circle doesn't touch another target.
-2. Text reflows at 400% zoom without horizontal scrolling or lost content.
-3. Focus and screen-reader order match the visual order; interactive elements have accessible names.
-4. Nothing relies on hover — every interaction works by touch (and has a keyboard alternative where relevant).
+WCAG target size (2.5.8): controls must be at least 24x24 CSS px, or spaced so that a 24px-diameter circle centered on each does not intersect another target. Evidence in frame: find the smallest adjacent controls; those clearly under 24px and touching are a FAIL; exact measurement from a frame is an estimate, so borderline cases are UNCERTAIN.
+Zoom reflow: content must reflow at 400% zoom without horizontal scrolling. Evidence in frame: visible fixed-width containers or wide tables suggest failure, but the behavior itself cannot be proven from one frame — mark UNCERTAIN unless a fixed-width layout is clearly visible.
+Reading & focus order: visual order should match reading order, and controls should appear labeled. Evidence in frame: visible controls without labels, or elements whose placement contradicts their purpose, are a FAIL; actual screen-reader order is UNCERTAIN from a frame.
+No hover reliance: critical content must not be hidden behind hover. Evidence in frame: a hover-only affordance (tooltip trigger, dropdown with no always-visible label) whose content is hidden in the frame is a FAIL.

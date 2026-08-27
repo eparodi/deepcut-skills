@@ -107,7 +107,7 @@ func defaultBackoff(attempt int) time.Duration {
 const systemPromptTemplate = `You are a visual QA reviewer. A screenshot of a web page will be provided.
 Evaluate the screenshot against each checklist item and respond with ONLY a JSON object of this exact shape:
 {"checks": [{"item": "<checklist item>", "verdict": "PASS|FAIL|UNCERTAIN", "reason": "<short reason>"}]}
-Every checklist item must appear exactly once. Use PASS only when the item clearly holds, FAIL only when it clearly does not, UNCERTAIN when the screenshot cannot tell.
+Every checklist item must appear exactly once. Verify each item against what is visible in the screenshot: PASS only when the frame shows the criterion clearly holding, FAIL only when it clearly does not. When the screenshot cannot show the required evidence, mark the item UNCERTAIN — never PASS on missing evidence.
 Checklist:
 %s`
 
@@ -177,7 +177,7 @@ func (c *visionClient) chatOnce(ctx context.Context, png []byte, userText, syste
 			}},
 		},
 		ResponseFormat: responseFormat{Type: "json_object"},
-		MaxTokens:      2048,
+		MaxTokens:      4096,
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {

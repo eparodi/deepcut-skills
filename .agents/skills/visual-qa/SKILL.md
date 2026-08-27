@@ -103,17 +103,25 @@ Smashing, CSS-Tricks, MDN, LukeW, A List Apart, Baymard — see
 go run ./tools/visualqa --url <url> --device mobile \
   --checklist @tools/visualqa/checklists/mobile/layout.md
 
-# everything for a device
---checklist @tools/visualqa/checklists/mobile/all.md
+# ALL groups: pass the directory — every .md file inside is read,
+# sorted by filename, and concatenated (no all.md file to maintain)
+--checklist @tools/visualqa/checklists/mobile/
 ```
 
 Groups: `layout`, `typography`, `navigation`, `forms`, `media`,
-`interactions`, `accessibility` (one file per device × group;
-`all.md` = the full device set). Each device is tuned to its form
-factor — mobile is touch/thumb/safe-area centric, tablet adds hybrid
-hover+touch and split-pane, desktop adds keyboard operation and
-window-resize behavior. A device `all.md` is 28 items, under the
-tool's 32-check response clamp.
+`interactions`, `accessibility` (one file per device × group). Each
+device is tuned to its form factor — mobile is touch/thumb/safe-area
+centric, tablet adds hybrid hover+touch and split-pane, desktop adds
+keyboard operation and window-resize behavior. A full device run is
+28 rules, under the tool's 32-check response clamp.
+
+**Rule precision:** every rule states an exact bar (44×44 CSS px touch
+targets, WCAG 2.5.8's 24×24, 4.5:1/3:1 contrast, 60-80ch line
+length), the in-frame evidence that supports it, and when the frame
+cannot show it. The model is instructed to mark UNCERTAIN when the
+evidence is not visible — never PASS on missing evidence. An
+UNCERTAIN verdict means "needs a human or a different check", not a
+weak pass.
 
 ### 4. Interpreting verdicts
 

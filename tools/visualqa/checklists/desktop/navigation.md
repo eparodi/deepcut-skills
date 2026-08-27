@@ -1,4 +1,4 @@
-1. Navigation fits the desktop form factor — top nav or sidebar with working hover states; the current location is clear (active state, breadcrumbs).
-2. Keyboard navigation works: Tab order is sensible, focus is visible, Enter and Escape behave.
-3. Dropdown menus work with mouse hover AND keyboard focus — no hover-only traps.
-4. Deep pages have breadcrumbs or back affordances.
+Nav fit: top navigation or sidebar with the current location clear (active state or breadcrumbs). Evidence in frame: no visible navigation or no location cue is a FAIL.
+Keyboard operation: Tab order and Enter/Escape behavior cannot be fully proven from a static frame. Evidence in frame: if any element shows a visible focus ring, check that it is clearly indicated; a focused element with no visible indication is a FAIL; otherwise mark UNCERTAIN.
+Dropdowns: menus must be reachable by mouse hover AND keyboard focus — a trigger that only responds to hover excludes keyboard users. Evidence in frame: an open dropdown must show a keyboard-reachable trigger; hover-only affordances are a FAIL; focus behavior itself is UNCERTAIN.
+Deep-page navigation: nested pages must show breadcrumbs or a back affordance. Evidence in frame: none visible is a FAIL.

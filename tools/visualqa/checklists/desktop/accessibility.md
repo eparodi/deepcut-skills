@@ -1,4 +1,4 @@
-1. The page is fully operable by keyboard: Tab, Enter, Space, Escape, and arrows work; focus is always visible.
-2. Contrast meets WCAG AA in both themes; focus order matches the visual order.
-3. Controls meet WCAG 2.2 Target Size (Minimum): 24x24 CSS pixels, or spaced so a 24px circle doesn't touch another target.
-4. Screen-reader basics: landmarks, heading structure, accessible names; dynamic content is announced.
+Keyboard operation: the page must be operable by keyboard with visible focus. Evidence in frame: interactive elements should show a visible focus indicator; a focused element without one is a FAIL; the full tab flow itself is UNCERTAIN from a frame.
+Contrast & focus order: contrast must meet WCAG AA in both themes, and visual order should match focus order. Evidence in frame: a focused element whose placement contradicts the visible order is a FAIL; otherwise focus-order claims are UNCERTAIN from a frame.
+WCAG target size (2.5.8): controls must be at least 24x24 CSS px, or spaced so that a 24px-diameter circle centered on each does not intersect another target. Evidence in frame: smallest adjacent controls clearly under 24px and touching are a FAIL; borderline is UNCERTAIN.
+Structure & names: landmarks, heading hierarchy, and labeled controls should be evident. Evidence in frame: visible controls without labels, or an obvious lack of heading structure, are a FAIL; screen-reader announcements are UNCERTAIN from a frame.

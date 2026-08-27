@@ -1,4 +1,4 @@
-1. Body text is readable without pinch-zoom (effective font size at least 16px) with comfortable line height.
-2. Text contrast meets WCAG AA (4.5:1 body, 3:1 large text) in both light and dark themes.
-3. No truncation or ellipsis cuts off meaning; text wraps cleanly without overflowing its container.
-4. Layout doesn't shift as web fonts or images load (no cumulative layout shift).
+Body text size: body copy must be legible without zooming — roughly 16 CSS px, about 4-5% of the 375px frame width per text line. Evidence in frame: estimate the x-height of body text against the frame width; text clearly smaller than that (or smaller than nearby button/label chrome) is a FAIL, borderline is UNCERTAIN.
+Contrast: text must meet WCAG AA — 4.5:1 for body text, 3:1 for large text (24px and up) — in the visible theme. Evidence in frame: flag gray-on-white, white-on-pale, or colored-on-colored pairs; when you cannot confidently judge the ratio, mark UNCERTAIN rather than guessing.
+Truncation: no text may be clipped or ellipsized in a way that hides meaning — titles, buttons, labels, and list rows must show their full intended content. Evidence in frame: "..." or mid-word cuts at card, button, or row boundaries are a FAIL.
+Layout shift: content must not appear displaced, overlapping, or misaligned after load. Evidence in frame: from a single frame, flag placeholder boxes that clearly misalign with the content around them or elements that overlap; whether shift actually happens over time cannot be proven from one frame, so mark UNCERTAIN when nothing is visibly wrong.

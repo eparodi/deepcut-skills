@@ -249,7 +249,7 @@ go run ./tools/visualqa \
   --url <url> | --flow <feature.json> \
   --device mobile|tablet|desktop \
   [--case <name>] \
-  [--checklist <text|@file>] \
+  [--checklist <text|@file|@dir>] \
   [--api-base https://api.deepseek.com] \
   [--out artifacts/visualqa] \
   [--max-steps 15] [--max-screenshots 12] \
@@ -261,6 +261,9 @@ go run ./tools/visualqa \
   `https://api.deepseek.com`); added at implementation time so the
   tool can run against local proxies and test fakes (see Implementation
   Notes).
+- `--checklist @<path>` accepts a file (verbatim) or a directory (all
+  `.md` files inside, sorted by filename, concatenated — the "run all
+  groups" mode).
 - One-shot mode synthesizes a single implicit case: `goto <url>` →
   `screenshot`.
 
@@ -498,10 +501,22 @@ feature (VQ-2 keeps them apart later).
   ten verified sources (`docs/research/visual-qa-device-design-sources.md`:
   Google web.dev, W3C WAI + WCAG 2.2 (pins the 24×24 CSS px target-size
   number), NN/g, Smashing, CSS-Tricks, MDN, LukeW, A List Apart,
-  Baymard). Each device has group files + an `all.md` (28 items). The
-  vision-response clamp was raised 24 → 32 (and `max_tokens`
-  1024 → 2048) so a full device run fits; pinned by
+  Baymard). The vision-response clamp was raised 24 → 32 (and
+  `max_tokens` 1024 → 2048) so a full device run fits; pinned by
   `TestParseChecksClampsToMax`.
+
+- **2026-08-26 (checklist library v2 — directory mode + precision):**
+  per operator feedback, `--checklist @<dir>` now reads every `.md`
+  file in the folder (sorted, concatenated) instead of a hand-
+  maintained `all.md` (the files were deleted); pinned by
+  `TestLoadChecklistDirectory`/`TestLoadChecklistFile`. Every rule was
+  rewritten to state an exact bar (44×44 CSS px, WCAG 2.5.8 24×24,
+  4.5:1/3:1 contrast, 60-80ch line length), the in-frame evidence that
+  supports it, and an explicit UNCERTAIN marker when a static frame
+  cannot prove it (keyboard behavior, zoom reflow, tab order, hover).
+  The system prompt now instructs the model: PASS only on visible
+  evidence, UNCERTAIN when evidence is absent (never PASS on missing
+  evidence); `max_tokens` raised 2048 → 4096 for the longer items.
 
 ## Task Checklist (Phase 3)
 

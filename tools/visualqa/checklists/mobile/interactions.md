@@ -1,4 +1,4 @@
-1. Tap targets are at least 44x44 CSS pixels (48dp) with adequate spacing between them.
-2. Touches get immediate visual feedback (active states) — no dead taps.
-3. Scrolling feels natural — no scroll traps, jank, or sticky elements covering content.
-4. Loading, empty, and error states are visible and give a path forward.
+Touch target size: buttons, links, and nav items must be at least 44x44 CSS px (48dp) with visible spacing between them. Evidence in frame: estimate against the frame width — 44px is about 12% of 375px; adjacent targets that look smaller or that touch are a FAIL, borderline is UNCERTAIN.
+Press feedback: interactive elements must have a distinct resting state (fill, border, shadow, color) that signals tappability. Evidence in frame: elements that look flat and indistinguishable from surrounding text are a FAIL; actual press animation cannot be seen in a static frame, so never PASS on it.
+Sticky overlap: fixed headers or bottom bars must not cover interactive content. Evidence in frame: a bar overlapping a button, link, or form field is a FAIL.
+States: loading, empty, and error states must be visibly distinct and informative — skeletons or spinners while loading, guidance in empty states, and a retry or path forward in errors. Evidence in frame: a blank or content-less state with no cue is a FAIL.

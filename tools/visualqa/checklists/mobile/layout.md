@@ -1,4 +1,4 @@
-1. Content fits the viewport width — no horizontal scroll or clipped content at 375-390px.
-2. Nothing important is hidden under the notch, status bar, or home indicator (safe areas respected).
-3. Key content and primary actions are reachable within a one-handed thumb zone (lower half of the screen).
-4. The layout reflows correctly between portrait and landscape without breaking or losing content.
+Viewport fit: at 375px width the page must not overflow horizontally. Evidence in frame: any element (image, table, card, text) crossing the right viewport edge, a visible horizontal scrollbar, or text clipped at the right edge is a FAIL.
+Safe areas: critical UI (primary navigation, close buttons, primary actions, status text) must not be hidden under the notch, status bar, or home indicator. Evidence in frame: check the top and bottom screen edges for content tucked under rounded corners or device chrome; expect 16-24px clearance.
+Thumb reach: the primary action (main CTA, submit, primary nav item) should sit in the lower two-thirds of the frame. Evidence in frame: if the main action sits above the vertical middle or in an extreme corner, flag it as hard to reach one-handed.
+Orientation: the layout must match the frame's aspect ratio — a tall (portrait) frame must not show a stretched wide layout, and a wide (landscape) frame must not show a squeezed portrait layout. Evidence in frame: distorted, overlapped, or unexpectedly sparse columns are a FAIL.

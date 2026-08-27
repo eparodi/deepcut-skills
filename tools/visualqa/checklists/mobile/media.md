@@ -1,4 +1,4 @@
-1. Images scale to their container and don't overflow, stretch, or distort.
-2. Media keeps correct aspect ratios — no letterboxing, cropping, or distortion.
-3. Videos and embeds are playable with touch controls and don't block content.
-4. Lazy-loaded media doesn't cause jarring layout shift as it loads.
+Image scaling: images must fit their container — no overflow past the frame edge and no stretching or squashing. Evidence in frame: an image that crosses the viewport edge, or whose shape contradicts its subject (a square object squeezed wide, a face elongated), is a FAIL.
+Aspect ratios: media must not be wrongly cropped, letterboxed, or pillarboxed. Evidence in frame: visible bars, cut-off subjects, or extreme zoom crops are a FAIL.
+Video & embeds: a visible video player must show play controls and must not cover other content. Evidence in frame: a player without a play button, or one overlapping content, is a FAIL.
+Lazy loading: media placeholders must align with the content that loads into them. Evidence in frame: misaligned placeholder boxes or visibly jumping/overlapping content are a FAIL; if no mismatch is visible, mark UNCERTAIN (timing cannot be judged from a single frame).

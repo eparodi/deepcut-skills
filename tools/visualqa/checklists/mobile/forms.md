@@ -1,4 +1,4 @@
-1. Inputs are at least 44-48px tall and don't trigger page zoom on focus (font size at least 16px).
-2. The keyboard type matches the field (email, number, phone, search).
-3. Labels are visible and associated; the focus state is obvious; validation errors are readable without zooming.
-4. Checkboxes, radios, and selects have touch-friendly hit areas — no tiny tap zones.
+Input size: visible text inputs must be at least 44-48px tall — comparable to the height of standard buttons in the frame. Evidence in frame: inputs visibly shorter than buttons or shorter than roughly 1/8 of the frame height are a FAIL; borderline is UNCERTAIN.
+Keyboard behavior: the correct keyboard type (email, number, phone, search) cannot be proven from a static frame. Evidence in frame: if an input is focused with a visible caret, check that it is not overlapped by a bottom sheet or keyboard region; otherwise mark UNCERTAIN and rely on manual testing.
+Labels & validation: every visible input must have a visible label or placeholder, and visible error messages must be readable without zooming and appear near their field. Evidence in frame: unlabeled fields or cut-off, tiny, or off-screen error text are a FAIL.
+Touch hit area: checkboxes, radios, and selects must be tappable over at least ~44px including padding — not just the visible glyph. Evidence in frame: bare glyphs under ~20px with no surrounding padding are a FAIL.

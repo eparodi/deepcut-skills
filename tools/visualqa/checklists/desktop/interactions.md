@@ -1,4 +1,4 @@
-1. Hover states give feedback on interactive elements (links, buttons, table rows).
-2. Click targets are at least 32x32 CSS pixels with spacing — no overlapping interactive areas.
-3. Scroll behavior is sane; sticky headers don't cover content; no scroll traps.
-4. Loading, empty, and error states are visible and give a path forward.
+Hover feedback: interactive elements (links, buttons, table rows) must look interactive — distinct styling that implies a hover/click response. Evidence in frame: elements that look flat and indistinguishable from static text are a FAIL; whether hover states actually render cannot be seen in a static frame (the tool does not simulate hover in v1), so mark UNCERTAIN rather than PASS.
+Click targets: controls must be at least 24x24 CSS px (WCAG), 32px+ preferred, with spacing — no overlapping interactive areas. Evidence in frame: small adjacent controls that touch are a FAIL; borderline is UNCERTAIN.
+Scroll & sticky: scrolling must not trap content, and sticky headers must not cover content. Evidence in frame: a fixed bar overlapping content or a control is a FAIL.
+States: loading, empty, and error states must be visibly distinct and informative. Evidence in frame: a blank or content-less state with no cue is a FAIL.

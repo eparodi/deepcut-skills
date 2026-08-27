@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -36,6 +37,42 @@ func loadEnvFile(path string) (map[string]string, error) {
 		out[strings.TrimSpace(k)] = strings.TrimSpace(v)
 	}
 	return out, nil
+}
+
+// loadChecklist reads a checklist from a file (verbatim) or a directory (all
+// *.md files concatenated in sorted filename order — the "run all groups for
+// this device" mode). Non-.md files and subdirectories are skipped.
+func loadChecklist(path string) (string, error) {
+	st, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("checklist %s: %w", path, err)
+	}
+	if !st.IsDir() {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("checklist %s: %w", path, err)
+		}
+		return string(b), nil
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return "", fmt.Errorf("checklist dir %s: %w", path, err)
+	}
+	var parts []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(path, e.Name()))
+		if err != nil {
+			return "", fmt.Errorf("checklist %s: %w", filepath.Join(path, e.Name()), err)
+		}
+		parts = append(parts, strings.TrimSpace(string(b)))
+	}
+	if len(parts) == 0 {
+		return "", fmt.Errorf("checklist dir %s: no .md files", path)
+	}
+	return strings.Join(parts, "\n"), nil
 }
 
 // resolveModel applies flag > env > file > default.

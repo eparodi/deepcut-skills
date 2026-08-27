@@ -1,4 +1,4 @@
-1. The layout makes good use of the width — multi-column layout with a sensible content max-width; no stretched full-width text lines.
-2. Common window sizes (1440, 1280, 1024) render without horizontal scroll or broken grids.
-3. Resizing the window reflows content across breakpoints instead of squeezing or overlapping it.
-4. Density is appropriate for a pointer device — content is not oversized to mobile proportions.
+Width utilization: at 1440px the layout should use multiple columns with a capped content width — full-width text lines spanning the entire frame are a FAIL.
+Window sizes: the layout must look intentional at common widths (1440, 1280, 1024) — no horizontal scroll, no broken or cramped grids. Evidence in frame: right-edge clipping or columns that overlap or crowd at the current width are a FAIL.
+Reflow: resizing must reflow content across breakpoints instead of squeezing it. Evidence in frame: at the current width, columns that overlap or text that wraps into absurd shapes are a FAIL; dynamic resize behavior itself is UNCERTAIN from a single frame.
+Density: controls and type must be sized for a pointer device — not mobile proportions. Evidence in frame: buttons and text noticeably oversized as if the phone layout is being shown is a FAIL.

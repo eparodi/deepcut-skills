@@ -1,4 +1,4 @@
-1. Inputs are at least 44-48px tall with clear focus states — touch remains the primary input.
-2. The keyboard type matches the field (email, number, phone, search).
-3. Labels are visible and associated; validation errors are readable without zooming.
-4. Hover-visible form controls (e.g., date pickers, tooltips) don't hide tap targets or trap touch users.
+Input size: inputs must be at least 44-48px tall with a clear focus indication — touch remains the primary input even with a pointer available. Evidence in frame: inputs visibly shorter than buttons are a FAIL; borderline is UNCERTAIN.
+Keyboard behavior: the correct keyboard type cannot be proven from a static frame. Evidence in frame: if a field is focused with a visible caret, check it is not overlapped by a keyboard region; otherwise mark UNCERTAIN.
+Labels & validation: visible labels or placeholders on every input; error messages readable without zooming and near their field. Evidence in frame: unlabeled fields or clipped, tiny, or off-screen errors are a FAIL.
+Hover form controls: date pickers, tooltips, and dropdowns must not hide their trigger or require hover to operate. Evidence in frame: a control whose label or trigger disappears, or whose content is hover-only, is a FAIL.

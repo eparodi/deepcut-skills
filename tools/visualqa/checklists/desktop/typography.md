@@ -1,4 +1,4 @@
-1. Body text is readable at desktop distance; reading content caps line length (~60-80 characters).
-2. Text contrast meets WCAG AA (4.5:1 body, 3:1 large text) in both light and dark themes.
-3. No truncation or ellipsis cuts off meaning in dense UI (tables, navigation, cards).
-4. Layout doesn't shift as web fonts or images load (no cumulative layout shift).
+Body text size & line length: body copy must be legible at desktop distance, and reading columns must be capped at roughly 60-80 characters (about 700-950px at 16px). Evidence in frame: text lines spanning the full frame width are a FAIL; text noticeably tiny for a 1440px frame (clearly under 14px) is a FAIL.
+Contrast: text must meet WCAG AA — 4.5:1 for body text, 3:1 for large text (24px and up) — in the visible theme. Evidence in frame: flag low-contrast pairs; an uncertain ratio is UNCERTAIN.
+Truncation in dense UI: tables, navigation, and cards must not ellipsize or clip values that carry meaning. Evidence in frame: "..." or mid-value cuts in table cells, nav labels, or card titles are a FAIL.
+Layout shift: content must not appear displaced, overlapping, or misaligned after load. Evidence in frame: overlapping or misaligned elements are a FAIL; timing is UNCERTAIN from one frame.

@@ -1,4 +1,4 @@
-1. Primary navigation is reachable with one thumb (bottom tab bar or an easily reachable menu).
-2. Back navigation is visible and works — no dead ends or trap pages.
-3. Menu/drawer opens without hiding the current context and closes easily (scrim tap or close button).
-4. The current location is clear (active nav state, breadcrumb, or page title).
+Nav reachability: primary navigation must be visible in the initial frame — a bottom tab bar, a top menu button, or an equivalent control. Evidence in frame: a screen with no visible navigation control at all is a FAIL.
+Back affordance: every screen below the top level must show a back control (arrow, breadcrumb, or cancel). Evidence in frame: if the frame offers no way to return, it is a FAIL.
+Open overlay: if a menu or drawer is open in the frame, it must not fully obscure the underlying content and must show a close affordance (scrim tap area, X, or close label). Evidence in frame: check the visible overlay for a clear dismissal.
+Location cue: the current section must be identifiable from the frame — an active tab highlight, breadcrumb, or page title. Evidence in frame: if you cannot tell where you are from the frame, it is a FAIL.

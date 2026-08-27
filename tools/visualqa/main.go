@@ -104,12 +104,12 @@ func run(args []string) int {
 
 	checklist := *checklistFlag
 	if strings.HasPrefix(checklist, "@") {
-		b, err := os.ReadFile(strings.TrimPrefix(checklist, "@"))
+		c, err := loadChecklist(strings.TrimPrefix(checklist, "@"))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "checklist file: %v\n", err)
+			fmt.Fprintln(os.Stderr, err)
 			return exitValidation
 		}
-		checklist = string(b)
+		checklist = c
 	}
 	if checklist == "" {
 		checklist = strings.Join(defaultChecklist(), "\n")
