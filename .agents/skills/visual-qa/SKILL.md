@@ -136,6 +136,13 @@ weak pass.
   requests captured from CDP events — worth checking before trusting
   a PASS.
 
+## Interpreting verdicts — context matters
+
+A FAIL is only a finding if the page SHOULD have the thing. On a
+pre-auth login page, nav-reachability/back-check FAILs are expected
+context (no nav exists yet) — do not file them as regressions.
+Check the run's screenshots and step order before trusting a FAIL.
+
 ## Guardrails
 
 - Budget flags are mandatory for interactive flows: `--max-steps`,
@@ -149,9 +156,9 @@ weak pass.
 - Model is user-configurable: `--model` flag > `DEEPSEEK_VISION_MODEL`
   (env, then `.env.visualqa`) > default `deepseek-v4-flash-vision-exp`.
 - No autonomous exploration loops in v1 (VQ-1).
-- Retries happen only on 429/500/503; a 4xx (including 402 empty
-  balance) fails the run with the provider message — never re-send a
-  malformed payload.
+- Retries happen on 429/500/503 and on 200s with unparseable
+  (truncated) bodies — a 4xx (including 402 empty balance) fails the
+  run with the provider message — never re-send a malformed payload.
 
 ## Test Task
 

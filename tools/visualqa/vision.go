@@ -82,7 +82,6 @@ type visionClient struct {
 	apiKey  string
 	model   string
 	retries int
-	timeout time.Duration
 	http    *http.Client
 	backoff func(attempt int) time.Duration
 }
@@ -177,7 +176,10 @@ func (c *visionClient) chatOnce(ctx context.Context, png []byte, userText, syste
 			}},
 		},
 		ResponseFormat: responseFormat{Type: "json_object"},
-		MaxTokens:      4096,
+		// 8192: the model spends 2k-4k tokens in reasoning_content before the
+		// checks; 4096 was exhausted by reasoning alone, returning empty
+		// content (observed 2026-08-27 on the 28-item mobile checklist).
+		MaxTokens: 8192,
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -210,7 +212,14 @@ func (c *visionClient) chatOnce(ctx context.Context, png []byte, userText, syste
 		if resp.StatusCode == http.StatusOK {
 			var cr chatResponse
 			if err := json.Unmarshal(respBody, &cr); err != nil {
-				return nil, fmt.Errorf("vision response: %w", err)
+				// A 200 with a truncated/unparseable body is a transient provider
+				// failure (observed 2026-08-27: truncated JSON-mode bodies).
+				// Retry within the budget instead of hard-failing the run.
+				if attempt < c.retries {
+					sleepCtx(ctx, c.backoff(attempt))
+					continue
+				}
+				return nil, fmt.Errorf("vision response: unparseable body after %d attempts: %w", attempt+1, err)
 			}
 			return &cr, nil
 		}

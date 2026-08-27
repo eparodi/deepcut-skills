@@ -518,6 +518,33 @@ feature (VQ-2 keeps them apart later).
   evidence, UNCERTAIN when evidence is absent (never PASS on missing
   evidence); `max_tokens` raised 2048 → 4096 for the longer items.
 
+- **2026-08-27 (vision reliability, live evidence):** the real DeepSeek
+  round-trip against the trading-bot dashboard exposed two budget
+  limits that were too tight for a full 28-item device checklist:
+  (1) tool-shaped responses take **26–33 s** (measured via probe), so
+  the 30 s `http.Client` timeout killed calls with
+  `context deadline exceeded` or a server-cut truncated body;
+  (2) the model spends **2 k–4 k tokens in `reasoning_content`** before
+  the checks, so `max_tokens: 4096` was exhausted by reasoning alone,
+  returning empty content. Fixes in `vision.go`/`main.go`:
+  client timeout 30 s → 120 s, `max_tokens` 4096 → 8192, and a 200
+  with an unparseable (truncated) body is now retried within the
+  budget instead of hard-failing (pinned by
+  `TestAnalyzeTruncatedBodyRetries`/`TestAnalyzeTruncatedBodyExhausted`;
+  `MaxTokens >= 8192` pinned in the httptest fake). The dead
+  `timeout` field on `visionClient` (never read — the real timeout
+  lives on `http.Client`) was removed.
+
+- **2026-08-27 (live bot-dashboard validation):** full mobile flow
+  (login → home → settings → trades) against the bot dashboard's
+  offline QA instance (`127.0.0.1:18080`, local `operator` test
+  credential) completed: **68 PASS · 7 FAIL · 37 UNCERTAIN** with real
+  findings (settings remove-X tag button under 24×24 px, trades
+  inline links under 44×44 px with tight spacing, no back affordance
+  on the trades sub-page). Caveat to record: nav-reachability/back
+  checks FAIL by design on the pre-auth login page — a single-frame
+  run cannot know a control is elsewhere; per-page context matters.
+
 ## Task Checklist (Phase 3)
 
 1. [x] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold

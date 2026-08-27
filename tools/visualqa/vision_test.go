@@ -47,6 +47,9 @@ func (f *fakeOpenAI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if req.ResponseFormat.Type != "json_object" {
 		f.t.Errorf("response_format = %+v, want json_object", req.ResponseFormat)
 	}
+	if req.MaxTokens < 8192 {
+		f.t.Errorf("MaxTokens = %d, want >= 8192 (reasoning_content eats the budget)", req.MaxTokens)
+	}
 
 	f.calls++
 	idx := f.calls - 1
@@ -76,7 +79,6 @@ func newTestClient(t *testing.T, responses []fakeResp) (*visionClient, *fakeOpen
 		apiKey:  "test_key",
 		model:   "deepseek-v4-flash-vision-exp",
 		retries: 3,
-		timeout: 10 * time.Second,
 		http:    srv.Client(),
 		backoff: func(int) time.Duration { return time.Millisecond },
 	}
@@ -258,6 +260,42 @@ func asProviderError(err error, target **providerError) bool {
 	}
 	*target = pe
 	return true
+}
+
+func TestAnalyzeTruncatedBodyRetries(t *testing.T) {
+	// A 200 with a truncated JSON body is a transient response — it must
+	// retry within the budget, not hard-fail the run.
+	good := validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}]}`)
+	c, fake, _ := newTestClient(t, []fakeResp{
+		{status: 200, body: `{"choices":[{"message":{"con`}, // truncated mid-body
+		{status: 200, body: good},
+	})
+	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	if len(got) != 1 || got[0].Verdict != "PASS" {
+		t.Errorf("checks = %+v", got)
+	}
+	if fake.calls != 2 {
+		t.Errorf("calls = %d, want 2 (retry after truncated body)", fake.calls)
+	}
+}
+
+func TestAnalyzeTruncatedBodyExhausted(t *testing.T) {
+	c, fake, _ := newTestClient(t, []fakeResp{
+		{status: 200, body: `{"choices":`}, // truncated every time
+		{status: 200, body: `{"choices":`},
+		{status: 200, body: `{"choices":`},
+		{status: 200, body: `{"choices":`},
+	})
+	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	if err == nil {
+		t.Fatal("analyze succeeded, want error after retry budget")
+	}
+	if fake.calls != 4 {
+		t.Errorf("calls = %d, want 4 (initial + 3 retries)", fake.calls)
+	}
 }
 
 func TestParseChecksClampsToMax(t *testing.T) {

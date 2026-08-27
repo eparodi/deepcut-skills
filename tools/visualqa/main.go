@@ -115,13 +115,15 @@ func run(args []string) int {
 		checklist = strings.Join(defaultChecklist(), "\n")
 	}
 
+	// Per-call timeout of 120s: full-device checklist responses take 26-33s
+	// (measured 2026-08-27); the old 30s caused context-deadline and
+	// truncated-body failures. The run-level --timeout bounds the whole run.
 	vision := &visionClient{
 		baseURL: *apiBaseFlag,
 		apiKey:  key,
 		model:   model,
 		retries: *retriesFlag,
-		timeout: 30 * time.Second,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    &http.Client{Timeout: 120 * time.Second},
 		backoff: defaultBackoff,
 	}
 
