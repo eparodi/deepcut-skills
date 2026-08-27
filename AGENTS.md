@@ -996,3 +996,22 @@ drifting a pinned +2.0% delta to +1.0%; extends the
 §10.14/§10.25 time-anchor family). Anchor with `now − offset` values
 that are always inside the range, or run the time-sensitive test on
 both sides of midnight UTC.
+
+### 10.54 Markdown Structure Parsing Must Be Fence-Aware
+
+**Extracting structure from markdown (headings, links, outlines) must skip
+fenced code blocks — template examples inside ``` fences are content, not
+structure** (2026-08-26: a generated catalog listed a skill's
+template-example headings as six extra sections). A naive extractor that
+matches heading syntax anywhere in the file silently lists placeholder
+sections from embedded templates as if they were real. Pin the real
+section counts of template-embedding documents in a test.
+
+### 10.55 Docs-Deliverable Form Factor Is a User Decision, Not an Assumption
+
+**Before designing a wiki/docs deliverable, confirm the delivery surface
+(in-repo docs, GitHub wiki, hosted site) with the user — never bake a
+form-factor non-goal into a spec without asking** (2026-08-26: a wiki
+spec's "no GitHub wiki" non-goal contradicted the operator's actual
+intent). The requirements gate is the cheapest place to learn the surface;
+the shipped artifact is the most expensive place.
