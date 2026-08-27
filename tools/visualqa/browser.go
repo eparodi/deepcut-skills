@@ -85,16 +85,58 @@ func (s *browserSession) close() {
 
 var unsafeName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
-// capture takes a viewport screenshot, writes it to dir, and returns the
-// filename plus the PNG bytes (passed straight to the vision client). Names
-// are sanitized so a flow can never escape the run dir.
-func (s *browserSession) capture(dir, name string) (string, []byte, error) {
-	buf := s.page.MustScreenshot()
+// maxFullPageHeight guards the Chrome capture itself (device px). Beyond it
+// the capture is silently clipped, so taller pages fall back to a viewport
+// capture with a diagnostic. 17679 device px was captured cleanly by Chrome
+// 151 (2026-08-27); 32768 leaves comfortable headroom.
+const maxFullPageHeight = 32768
+
+func fullPageHeightOK(h int) bool { return h <= maxFullPageHeight }
+
+// capture takes a screenshot (viewport or full-page), writes it to dir, and
+// returns the filename plus the PNG bytes (passed straight to the vision
+// client). Names are sanitized so a flow can never escape the run dir. The
+// guard checks DEVICE pixels (CSS height × DPR), because that is what the
+// capture and the vision API limits operate on.
+func (s *browserSession) capture(dir, name string, full bool, dpr float64) (string, []byte, error) {
+	if full {
+		cssH := int(s.page.MustEval(`function() { return Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) }`).Num())
+		if devH := int(float64(cssH) * dpr); !fullPageHeightOK(devH) {
+			s.addDiag(fmt.Sprintf("full-page capture skipped: page %d device px tall exceeds the %d px capture cap — captured viewport instead", devH, maxFullPageHeight))
+			full = false
+		}
+	}
+	var buf []byte
+	if full {
+		buf = s.page.MustScreenshotFullPage()
+		// The vision API rejects images with a side > 8192px (400
+		// "unsupported image", 2026-08-27). Downscale to fit so the whole
+		// page still ships; the model sees ~800x800 of detail regardless,
+		// and the HTML channel carries the structural precision.
+		if scaled, err := fitMaxDimension(buf, maxVisionImageDimension); err == nil {
+			buf = scaled
+		} else {
+			s.addDiag("full-page downscale failed: " + err.Error())
+		}
+	} else {
+		buf = s.page.MustScreenshot()
+	}
 	file := unsafeName.ReplaceAllString(name, "-") + ".png"
 	if err := os.WriteFile(filepath.Join(dir, file), buf, 0o644); err != nil {
 		return "", nil, err
 	}
 	return file, buf, nil
+}
+
+// pageHTML fetches the serialized DOM for the structural-evidence channel
+// (US8). rod panics on eval failure; recovered into a clean error.
+func (s *browserSession) pageHTML() (html string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("fetch html: %v", r)
+		}
+	}()
+	return s.page.MustEval(`function() { return document.documentElement.outerHTML }`).Str(), nil
 }
 
 // execStep runs one flow action. Failures are returned as errors (rod Must*
@@ -116,9 +158,9 @@ func (s *browserSession) execStep(step flowStep) (err error) {
 	case "scroll":
 		switch step.To {
 		case "top":
-			s.page.MustEval(`window.scrollTo(0, 0)`)
+			s.page.MustEval(`function() { window.scrollTo(0, 0) }`)
 		case "bottom":
-			s.page.MustEval(`window.scrollTo(0, document.body.scrollHeight)`)
+			s.page.MustEval(`function() { window.scrollTo(0, document.body.scrollHeight) }`)
 		default:
 			s.page.MustElement(step.Selector).MustScrollIntoView()
 		}

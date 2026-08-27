@@ -21,6 +21,7 @@ type fakeOpenAI struct {
 	mu        sync.Mutex
 	calls     int
 	responses []fakeResp
+	last      *chatRequest
 }
 
 func (f *fakeOpenAI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -36,13 +37,19 @@ func (f *fakeOpenAI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		f.t.Errorf("decode request: %v", err)
 	}
-	// the request must carry the image in the LAST user content block
+	// the request must carry the image in one of the user content blocks
 	user := req.Messages[len(req.Messages)-1]
 	if len(user.Content) < 2 {
 		f.t.Errorf("user message content blocks = %d, want >= 2 (text + image)", len(user.Content))
 	}
-	if !strings.HasPrefix(user.Content[len(user.Content)-1].ImageURL.URL, "data:image/png;base64,") {
-		f.t.Errorf("last content block is not a base64 png data URL")
+	var imgURL string
+	for _, part := range user.Content {
+		if part.ImageURL != nil {
+			imgURL = part.ImageURL.URL
+		}
+	}
+	if !strings.HasPrefix(imgURL, "data:image/png;base64,") {
+		f.t.Errorf("no base64 png data URL image block, got %q", imgURL)
 	}
 	if req.ResponseFormat.Type != "json_object" {
 		f.t.Errorf("response_format = %+v, want json_object", req.ResponseFormat)
@@ -56,9 +63,16 @@ func (f *fakeOpenAI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if idx >= len(f.responses) {
 		idx = len(f.responses) - 1
 	}
+	f.last = &req
 	resp := f.responses[idx]
 	w.WriteHeader(resp.status)
 	fmt.Fprint(w, resp.body)
+}
+
+func (f *fakeOpenAI) lastRequest() *chatRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.last
 }
 
 func validBody(checksJSON string) string {
@@ -89,7 +103,7 @@ func TestAnalyzeSuccess(t *testing.T) {
 	checks := `{"checks":[{"item":"no horizontal overflow","verdict":"PASS","reason":"fits"},{"item":"tap targets","verdict":"FAIL","reason":"bottom bar covers the CTA"}]}`
 	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: validBody(checks)}})
 
-	got, usage, err := c.analyze(t.Context(), []byte("fake-png"), "cart-empty", "mobile", "checkout", "checklist")
+	got, usage, err := c.analyze(t.Context(), []byte("fake-png"), "cart-empty", "mobile", "checkout", "checklist", "")
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
@@ -114,7 +128,7 @@ func TestAnalyzeEmptyContentRepairThenReask(t *testing.T) {
 		{status: 200, body: validBody(`""`)},
 		{status: 200, body: good},
 	})
-	got, usage, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	got, usage, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
@@ -133,7 +147,7 @@ func TestAnalyzeFencedJSONRepairsLocally(t *testing.T) {
 	// Markdown-fenced JSON is repaired locally — no re-ask needed.
 	body := validBody("```json\n{\"checks\":[{\"item\":\"x\",\"verdict\":\"FAIL\",\"reason\":\"overlap\"}]}\n```")
 	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: body}})
-	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
@@ -150,7 +164,7 @@ func TestAnalyzeGarbageThenGarbageBecomesUncertain(t *testing.T) {
 		{status: 200, body: validBody(`"not json at all"`)},
 		{status: 200, body: validBody(`"still not json"`)},
 	})
-	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
@@ -166,7 +180,7 @@ func TestAnalyzeInvalidVerdictTriggersReask(t *testing.T) {
 	bad := validBody(`{"checks":[{"item":"x","verdict":"SOMETIMES","reason":"r"}]}`)
 	good := validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}]}`)
 	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: bad}, {status: 200, body: good}})
-	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
@@ -184,7 +198,7 @@ func TestAnalyzeRetryOn429(t *testing.T) {
 		{status: 429, body: `{"error":{"message":"rate limited"}}`},
 		{status: 200, body: good},
 	})
-	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
@@ -203,7 +217,7 @@ func TestAnalyze429ExhaustedFails(t *testing.T) {
 		{status: 429, body: `{"error":{"message":"rate limited"}}`},
 		{status: 429, body: `{"error":{"message":"rate limited"}}`},
 	})
-	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err == nil {
 		t.Fatal("analyze succeeded, want provider error")
 	}
@@ -223,7 +237,7 @@ func TestAnalyzeNoRetryOn400(t *testing.T) {
 	c, fake, _ := newTestClient(t, []fakeResp{
 		{status: 400, body: `{"error":{"message":"bad request"}}`},
 	})
-	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	var pe *providerError
 	if !asProviderError(err, &pe) {
 		t.Fatalf("err = %v, want *providerError", err)
@@ -240,7 +254,7 @@ func TestAnalyze402EmptyBalance(t *testing.T) {
 	c, fake, _ := newTestClient(t, []fakeResp{
 		{status: 402, body: `{"error":{"message":"Insufficient Balance"}}`},
 	})
-	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	var pe *providerError
 	if !asProviderError(err, &pe) {
 		t.Fatalf("err = %v, want *providerError", err)
@@ -262,6 +276,54 @@ func asProviderError(err error, target **providerError) bool {
 	return true
 }
 
+func TestAnalyzeWithHTML(t *testing.T) {
+	checks := validBody(`{"checks":[{"item":"target sizes","verdict":"PASS","reason":"html confirms 44px buttons"}]}`)
+	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: checks}})
+	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "<html><body><button>Buy</button></body></html>")
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	if len(got) != 1 || got[0].Verdict != "PASS" {
+		t.Errorf("checks = %+v", got)
+	}
+	req := fake.lastRequest()
+	if req == nil {
+		t.Fatal("no request captured")
+	}
+	user := req.Messages[len(req.Messages)-1]
+	if len(user.Content) != 3 {
+		t.Fatalf("user content blocks = %d, want 3 (text + image + html)", len(user.Content))
+	}
+	if !strings.Contains(user.Content[2].Text, "Page HTML:") || !strings.Contains(user.Content[2].Text, "<button>") {
+		t.Errorf("html block = %q, want Page HTML prefix with page markup", user.Content[2].Text)
+	}
+	system := req.Messages[0].Content[0].Text
+	if !strings.Contains(system, "structural evidence") {
+		t.Errorf("system prompt lacks the HTML instruction: %q", system)
+	}
+	if fake.calls != 1 {
+		t.Errorf("calls = %d, want 1", fake.calls)
+	}
+}
+
+func TestAnalyzeWithoutHTMLNoPromptChange(t *testing.T) {
+	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}]}`)}})
+	if _, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", ""); err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	req := fake.lastRequest()
+	if req == nil {
+		t.Fatal("no request captured")
+	}
+	system := req.Messages[0].Content[0].Text
+	if strings.Contains(system, "structural evidence") {
+		t.Errorf("system prompt mentions HTML without html enabled")
+	}
+	if len(req.Messages[len(req.Messages)-1].Content) != 2 {
+		t.Errorf("user content = %d blocks, want 2 without html", len(req.Messages[len(req.Messages)-1].Content))
+	}
+}
+
 func TestAnalyzeTruncatedBodyRetries(t *testing.T) {
 	// A 200 with a truncated JSON body is a transient response — it must
 	// retry within the budget, not hard-fail the run.
@@ -270,7 +332,7 @@ func TestAnalyzeTruncatedBodyRetries(t *testing.T) {
 		{status: 200, body: `{"choices":[{"message":{"con`}, // truncated mid-body
 		{status: 200, body: good},
 	})
-	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	got, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err != nil {
 		t.Fatalf("analyze: %v", err)
 	}
@@ -289,7 +351,7 @@ func TestAnalyzeTruncatedBodyExhausted(t *testing.T) {
 		{status: 200, body: `{"choices":`},
 		{status: 200, body: `{"choices":`},
 	})
-	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c")
+	_, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "")
 	if err == nil {
 		t.Fatal("analyze succeeded, want error after retry budget")
 	}

@@ -33,15 +33,17 @@ type flowStep struct {
 	MS       int    `json:"ms,omitempty"`
 	Name     string `json:"name,omitempty"`
 	Capture  bool   `json:"capture,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+	HTML     *bool  `json:"html,omitempty"`
 }
 
 var stepFieldSets = map[string]map[string]bool{
 	"goto":       {"action": true, "url": true},
-	"click":      {"action": true, "selector": true, "capture": true},
-	"type":       {"action": true, "selector": true, "text": true, "capture": true},
-	"scroll":     {"action": true, "to": true, "selector": true, "capture": true},
+	"click":      {"action": true, "selector": true, "capture": true, "mode": true, "html": true},
+	"type":       {"action": true, "selector": true, "text": true, "capture": true, "mode": true, "html": true},
+	"scroll":     {"action": true, "to": true, "selector": true, "capture": true, "mode": true, "html": true},
 	"wait":       {"action": true, "ms": true, "selector": true},
-	"screenshot": {"action": true, "name": true},
+	"screenshot": {"action": true, "name": true, "mode": true, "html": true},
 }
 
 func loadFlow(path string) (*flowFile, error) {
@@ -120,6 +122,9 @@ func (c *flowCase) validate() error {
 	}
 	shotNames := map[string]bool{}
 	for i, s := range c.Steps {
+		if s.Mode != "" && s.Mode != "viewport" && s.Mode != "full" {
+			return fmt.Errorf("step %d: mode must be viewport or full, got %q", i+1, s.Mode)
+		}
 		switch s.Action {
 		case "goto":
 			if strings.TrimSpace(s.URL) == "" {

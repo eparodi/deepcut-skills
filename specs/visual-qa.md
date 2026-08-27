@@ -181,6 +181,48 @@ feature or a new case is a consistent, rule-enforced JSON edit.
   and the convention: one feature per file, one case per scenario,
   relative URLs resolved against `base_url`.
 
+### User Story 7: Choose capture mode per step (viewport vs full page)
+
+As a QA operator, I want to capture the full page height instead of
+only the viewport, so below-fold issues are caught in one step — and I
+choose which mode each step uses, because viewport vs full-page
+genuinely change what the model can conclude (fixed elements render
+differently, below-fold content becomes visible).
+
+**Acceptance Criteria:**
+- Given a step with `"mode": "full"`, When the run captures it, Then
+  one screenshot spans the full scrollable height of the page
+  (viewport overridden to content size, then restored).
+- Given `--capture-mode full` at run level, When a capture-capable
+  step has no explicit `mode`, Then it captures full-page; a
+  per-step `"mode": "viewport"` overrides the run-level default.
+- Given a page taller than the 16384px Chrome capture cap, When a
+  full-page capture is requested, Then the run logs a diagnostic and
+  falls back to a viewport capture — never a failed run.
+- Given a step with an invalid `mode` value (not `viewport`/`full`),
+  When the flow loads, Then the strict loader exits 2 naming the
+  case/step before a browser launches.
+
+### User Story 8: Send page HTML as structural evidence
+
+As a QA operator, I want the sanitized page HTML sent alongside the
+screenshot, so the model can verify what a downscaled image cannot
+show (element sizes in px, labels, aria, alt, hrefs).
+
+**Acceptance Criteria:**
+- Given a step with `"html": true`, When the vision request is sent,
+  Then the user message contains a text block with the sanitized page
+  HTML (scripts/styles/comments stripped) alongside the image.
+- Given HTML longer than `--max-html-chars` (default 30,000 ≈ 7–8k
+  tokens), When sent, Then it is truncated with an explicit
+  `…[truncated]` marker so the model knows it is partial.
+- Given `--with-html` at run level, When a step has no explicit
+  `"html"`, Then HTML is included; a per-step `"html": false`
+  overrides it.
+- Given HTML present in the request, When the model responds, Then the
+  system prompt has instructed it to use the HTML for structural
+  evidence the screenshot cannot show.
+
 ## Non-Goals
 
 - ❌ Real-device or emulator testing (physical phones/tablets are
@@ -196,6 +238,16 @@ feature or a new case is a consistent, rule-enforced JSON edit.
 - ❌ Running the repo's test suites — that stays QA's manual step.
 - ❌ Multi-project repo restructure in v1 — single module for now
   (VQ-2).
+- ❌ Scroll-and-stitch capture for pages beyond the 16384px Chrome
+  capture cap — guard + viewport fallback instead; revisit only if a
+  real page exceeds it (US7 AC3).
+- ❌ Tiled multi-image requests — the HTML evidence channel (US8)
+  already compensates for the model's ~800×800 resize; tiles are a
+  follow-up if image-side legibility is needed.
+- ❌ Uncapped HTML in the vision request — `--max-html-chars` is the
+  cost control (US8 AC2).
+- ❌ Report/findings schema changes for capture mode — mode stays
+  visible in the flow file and screenshot files; no new report fields.
 
 ## Follow-ups (recorded, not in v1)
 
@@ -253,7 +305,8 @@ go run ./tools/visualqa \
   [--api-base https://api.deepseek.com] \
   [--out artifacts/visualqa] \
   [--max-steps 15] [--max-screenshots 12] \
-  [--timeout 5m] [--retries 3] [--model deepseek-v4-flash-vision-exp]
+  [--timeout 5m] [--retries 3] [--model deepseek-v4-flash-vision-exp] \
+  [--capture-mode viewport|full] [--with-html] [--max-html-chars 30000]
 ```
 
 - `--url` and `--flow` are mutually exclusive (one-shot vs flow mode).
@@ -266,6 +319,10 @@ go run ./tools/visualqa \
   groups" mode).
 - One-shot mode synthesizes a single implicit case: `goto <url>` →
   `screenshot`.
+- `--capture-mode viewport|full` sets the run-level capture default
+  (`viewport`); `--with-html` turns on HTML evidence at run level;
+  `--max-html-chars` caps the HTML sent per step (default 30,000
+  chars ≈ 7–8k tokens). Per-step `mode`/`html` fields override these.
 
 ### Flow schema (the authoring contract)
 
@@ -296,24 +353,44 @@ go run ./tools/visualqa \
 }
 ```
 
-**Captures are viewport-only in v1** — the vision model resizes every
-image to ~800×800 total pixels, so a tall full-page capture gets
-squished and loses the text detail mobile QA depends on. Below-fold
-content is covered with explicit `scroll` + `screenshot` steps.
-(Design refinement at the gate, 2026-08-26: US1 originally said
-"full-page"; corrected to viewport after checking the resize math
-against api-docs.deepseek.com.)
+**Capture modes (US7, added 2026-08-27):** every capture-capable step
+carries an optional `mode` — `viewport` (default; the v1 behavior) or
+`full` (whole scrollable height in one image). `full` uses rod's
+built-in full-page capture (verified in the installed v0.114.8 source:
+`PageGetLayoutMetrics` → viewport override to the content size →
+capture → deferred viewport restore — `page.go:426`/`must.go:383`),
+so no manual scroll-height math is needed. Fixed/sticky elements
+render once (at the top) in a full-page capture. Pages taller than
+Chrome's ~16384px per-side capture cap fall back to a viewport
+capture with a diagnostic (US7 AC3).
+
+**HTML evidence (US8, added 2026-08-27):** with `"html": true` (or
+`--with-html`), the step fetches `document.documentElement.outerHTML`,
+strips `<script>`/`<style>` blocks and comments, caps it at
+`--max-html-chars` (marking truncation with `…[truncated]`), and
+sends it as the last text block of the user message alongside the
+image. The system prompt gains a sentence (only when HTML is present)
+instructing the model to use the HTML for structural evidence the
+screenshot cannot show. The viewport-only caveat recorded at the
+2026-08-26 gate (resize squishes tall captures) still applies to the
+IMAGE alone — the HTML channel is the compensation, which is why
+`mode` and `html` are independent per-step knobs.
 
 **Actions** (the enum; anything else is a validation error):
 
 | action | fields | notes |
 |--------|--------|-------|
 | `goto` | `url` (relative → resolved against `base_url`) | navigation |
-| `click` | `selector`, `capture?` | first match; step FAILS if absent |
-| `type` | `selector`, `text`, `capture?` | fills an input |
-| `scroll` | `to: "top"\|"bottom"` **or** `selector`, `capture?` | |
+| `click` | `selector`, `capture?`, `mode?`, `html?` | first match; step FAILS if absent |
+| `type` | `selector`, `text`, `capture?`, `mode?`, `html?` | fills an input |
+| `scroll` | `to: "top"\|"bottom"` **or** `selector`, `capture?`, `mode?`, `html?` | |
 | `wait` | `ms` **or** `selector` | explicit settle |
-| `screenshot` | `name` (unique per case) | always captures |
+| `screenshot` | `name`, `mode?`, `html?` | always captures |
+
+`mode` must be `viewport` or `full`; `html` must be a boolean. Both
+only apply to capture-capable actions (screenshot, and click/type/
+scroll with `capture: true`); on any other action they are unknown
+fields and rejected.
 
 Validation rules (enforced by `flow.go`, pinned by tests):
 - Top level: `feature` (non-empty), `base_url` (valid http(s) URL),
@@ -321,7 +398,8 @@ Validation rules (enforced by `flow.go`, pinned by tests):
 - Per case: `name` (non-empty, unique within the file), `steps` (≥1).
 - Per step: `action` in the enum; fields required per action;
   unknown fields rejected (`DisallowUnknownFields`); `capture` only on
-  click/type/scroll.
+  click/type/scroll; `mode` ∈ {`viewport`, `full`}; `html` boolean
+  (mode/html only on capture-capable actions).
 - Relative `goto` URLs resolve against `base_url`; absolute URLs pass
   through.
 - `--case <name>` selects one case; unknown name = validation error.
@@ -545,6 +623,37 @@ feature (VQ-2 keeps them apart later).
   checks FAIL by design on the pre-auth login page — a single-frame
   run cannot know a control is elsewhere; per-page context matters.
 
+- **2026-08-27 (US7/US8 — full-page + HTML shipped):** capture mode
+  (`mode: full`) uses rod's built-in `MustScreenshotFullPage`
+  (layout-metrics → viewport override → capture → restore, verified in
+  the installed v0.114.8 source). The live run exposed the DeepSeek
+  vision API's **8192 px-per-side hard limit** (400 "unsupported
+  image" on a 1125×17679 px settings capture) — full-page captures
+  are now downscaled to fit via `fitMaxDimension` (stdlib
+  nearest-neighbor) before the request is sent. **Deviation from US7
+  AC3**, recorded here per spec-driven rules: the AC pinned a 16384px
+  viewport-fallback, but Chrome 151 captured 17679px cleanly, so the
+  real binding constraint is the API's 8192px, and downscaling
+  preserves the operator's full-page intent better than a viewport
+  fallback. The Chrome-side guard moved to 32768 device px (CSS ×
+  DPR — the guard now checks device pixels, the unit both Chrome and
+  the API operate on) with viewport fallback only for pathological
+  pages. Also fixed a latent rod bug: `Eval` wraps every script as
+  `(%s).apply(this, arguments)`, so all `MustEval` scripts must be
+  **function expressions** — the pre-existing `window.scrollTo(...)`
+  scroll steps would have panicked (caught while wiring the height
+  eval).
+
+- **2026-08-27 (capture mode changes findings — live diff):** the
+  same login flow run in viewport vs full+HTML produced materially
+  different verdicts: **68/7/37 → 49/9/27** (PASS/FAIL/UNCERTAIN).
+  Login page: 0 real FAILs → 6 FAILs (target sizes, input size, touch
+  hit area, thumb reach, body text); settings: 3 FAILs (remove-X tag
+  targets, labels) → 0; trades: back-affordance FAIL gone, WCAG/touch
+  target FAILs persist in both. Tokens: 10,967 → 37,266 (~9.3k/step
+  with HTML). Both verdict sets are correct for their evidence — this
+  is why `mode`/`html` are per-step knobs, not global behavior.
+
 ## Task Checklist (Phase 3)
 
 1. [x] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold
@@ -601,9 +710,63 @@ feature (VQ-2 keeps them apart later).
    `go test ./...` green (catalog + wiki up-to-date checks)
    → Satisfies: US5 AC1–AC2, US6 AC3
 
-10. [ ] (Live) Test Task: one-shot + a 2-case flow against a local
+10. [x] (Live) Test Task: one-shot + a 2-case flow against a local
     page on mobile; live vision round-trip with the real key
     → Run by the operator (key lives in the gitignored `.env.visualqa`)
     → Satisfies: US1/US2 end-to-end. Browser half proven by the smoke
     test (exit 0, mobile/tablet/desktop); the real DeepSeek
     round-trip still needs the operator's key + network.
+    → **2026-08-27:** completed live — full mobile flow against the
+    bot dashboard's offline QA instance (login → home → settings →
+    trades, 28-rule checklist): 68 PASS · 7 FAIL · 37 UNCERTAIN.
+
+11. [x] (Tooling) `flow.go` + `flow_test.go` — `mode`/`html` step
+    fields (per-step override of run-level defaults)
+    → Tests: valid parse; invalid mode rejected naming the step;
+    `html` non-boolean rejected; mode/html on `goto`/`wait` rejected
+    (unknown field); per-step override wins — red first
+    → Satisfies: US7 AC4, US8 AC3
+
+12. [x] (Tooling) `html.go` + `html_test.go` — sanitize + cap
+    → Tests: strip script/style/comments; cap at `--max-html-chars`
+    with `…[truncated]` marker; short HTML untouched; empty input —
+    red first
+    → Satisfies: US8 AC2
+
+13. [x] (Tooling) `browser.go` — full-page capture via rod's
+    `MustScreenshotFullPage` + 16384px guard (diagnostic + viewport
+    fallback); `outerHTML` fetch for the HTML channel
+    → Tests: pure helpers (guard threshold decision) unit-tested; the
+    capture itself is exercised in the live validation (task 16)
+    → Satisfies: US7 AC1–AC3, US8 AC1
+    → **2026-08-27:** guard moved to 32768 device px (CSS × DPR) and
+    the API's 8192px/side limit is handled by downscale-to-fit
+    (`fitMaxDimension`, task 17) — see Implementation Notes.
+
+14. [x] (Tooling) `vision.go` + `vision_test.go` — HTML text block in
+    the user message when enabled + system-prompt sentence
+    → Tests: request carries the HTML block after the image; prompt
+    mentions structural evidence only when HTML present; existing
+    non-HTML behavior unchanged — red first
+    → Satisfies: US8 AC1, US8 AC4
+
+15. [x] (Tooling) `main.go` — `--capture-mode`, `--with-html`,
+    `--max-html-chars` flags; per-step mode/html resolution;
+    validation of the run-level `--capture-mode` value
+    → Test: invalid `--capture-mode` exits 2 — red first
+    → Satisfies: US7 AC2, US8 AC3
+
+16. [x] (Live) full-page + HTML run against the bot dashboard; diff
+    the findings vs the viewport-only run (the operator's stated
+    motivation: capture mode changes findings)
+    → Run by the operator; record the finding diff in Implementation
+    Notes
+    → Satisfies: US7/US8 end-to-end
+
+17. [x] (Tooling) `img.go` + `img_test.go` — `fitMaxDimension`
+    downscale (stdlib nearest-neighbor) to the vision API's 8192px
+    per-side limit
+    → Tests: under-cap untouched; exact cap untouched; tall/wide
+    downscaled within 1px of fit with aspect preserved; invalid PNG
+    errors — red first
+    → Satisfies: US7 AC3 (revised behavior, see Implementation Notes)

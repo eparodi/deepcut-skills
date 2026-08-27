@@ -34,6 +34,7 @@ func TestRunValidationErrors(t *testing.T) {
 		{"malformed flow json", []string{"--flow", badFlow}, exitValidation},
 		{"unknown case", []string{"--flow", validFlowPath, "--case", "nope"}, exitValidation},
 		{"unknown flag", []string{"--url", "http://x", "--bogus", "1"}, exitValidation},
+		{"bad capture mode", []string{"--url", "http://x", "--capture-mode", "wide"}, exitValidation},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,3 +62,32 @@ func TestRunValidationErrors(t *testing.T) {
 // The browser path itself (launch, emulation, screenshot, actions) is
 // exercised by the skill's Test Task with a real Chrome — the repo has no
 // CI and unit tests must stay offline.
+
+func TestCaptureModeResolution(t *testing.T) {
+	full := true
+	falseVal := false
+	tests := []struct {
+		name     string
+		step     flowStep
+		defMode  string
+		defHTML  bool
+		wantMode string
+		wantHTML bool
+	}{
+		{"per-step mode wins", flowStep{Mode: "full"}, "viewport", false, "full", false},
+		{"run-level mode default", flowStep{}, "full", false, "full", false},
+		{"per-step html true wins", flowStep{HTML: &full}, "viewport", false, "viewport", true},
+		{"per-step html false overrides run-level", flowStep{HTML: &falseVal}, "viewport", true, "viewport", false},
+		{"run-level html default", flowStep{}, "viewport", true, "viewport", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := captureModeFor(tt.step, tt.defMode); got != tt.wantMode {
+				t.Errorf("captureModeFor = %q, want %q", got, tt.wantMode)
+			}
+			if got := htmlFor(tt.step, tt.defHTML); got != tt.wantHTML {
+				t.Errorf("htmlFor = %v, want %v", got, tt.wantHTML)
+			}
+		})
+	}
+}

@@ -39,6 +39,9 @@ func run(args []string) int {
 	retriesFlag := fs.Int("retries", 3, "vision-call retry budget for 429/500/503")
 	modelFlag := fs.String("model", "", "vision model (default deepseek-v4-flash-vision-exp)")
 	apiBaseFlag := fs.String("api-base", "https://api.deepseek.com", "OpenAI-compatible API base URL")
+	captureModeFlag := fs.String("capture-mode", "viewport", "capture default: viewport | full (per-step mode overrides)")
+	withHTMLFlag := fs.Bool("with-html", false, "send sanitized page HTML with each capture (per-step html overrides)")
+	maxHTMLCharsFlag := fs.Int("max-html-chars", 30000, "cap on the HTML sent per step, 0 = no cap")
 	if err := fs.Parse(args); err != nil {
 		return exitValidation
 	}
@@ -50,6 +53,10 @@ func run(args []string) int {
 	profile, ok := deviceProfileFor(*deviceFlag)
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown device %q (mobile | tablet | desktop)\n", *deviceFlag)
+		return exitValidation
+	}
+	if *captureModeFlag != "viewport" && *captureModeFlag != "full" {
+		fmt.Fprintf(os.Stderr, "unknown capture-mode %q (viewport | full)\n", *captureModeFlag)
 		return exitValidation
 	}
 
@@ -142,6 +149,9 @@ func run(args []string) int {
 		maxSteps:       *maxStepsFlag,
 		maxScreenshots: *maxShotsFlag,
 		vision:         vision,
+		captureMode:    *captureModeFlag,
+		withHTML:       *withHTMLFlag,
+		maxHTMLChars:   *maxHTMLCharsFlag,
 	})
 }
 
@@ -162,6 +172,27 @@ type executeParams struct {
 	maxSteps       int
 	maxScreenshots int
 	vision         *visionClient
+	captureMode    string
+	withHTML       bool
+	maxHTMLChars   int
+}
+
+// captureModeFor resolves a step's capture mode: a per-step mode wins, else
+// the run-level default (US7 AC2).
+func captureModeFor(step flowStep, def string) string {
+	if step.Mode != "" {
+		return step.Mode
+	}
+	return def
+}
+
+// htmlFor resolves whether a step sends HTML evidence: a per-step value
+// wins, else the run-level default (US8 AC3).
+func htmlFor(step flowStep, def bool) bool {
+	if step.HTML != nil {
+		return *step.HTML
+	}
+	return def
 }
 
 func execute(ctx context.Context, p executeParams) int {
@@ -260,7 +291,7 @@ func execute(ctx context.Context, p executeParams) int {
 				if name == "" {
 					name = step.Action
 				}
-				file, png, err := sess.capture(dir, name)
+				file, png, err := sess.capture(dir, name, captureModeFor(step, p.captureMode) == "full", p.profile.DPR)
 				if err != nil {
 					res.Error = "capture: " + err.Error()
 					report.Status = "FAILED"
@@ -271,7 +302,21 @@ func execute(ctx context.Context, p executeParams) int {
 				}
 				res.Screenshot = file
 
-				checks, usage, err := p.vision.analyze(ctx, png, res.Step, p.profile.Name, p.feature, p.checklist)
+				htmlText := ""
+				if htmlFor(step, p.withHTML) {
+					raw, err := sess.pageHTML()
+					if err != nil {
+						res.Error = "html: " + err.Error()
+						report.Status = "FAILED"
+						report.FailReason = res.Error
+						report.StepResults = append(report.StepResults, res)
+						report.Steps = stepsRun
+						return exitProvider
+					}
+					htmlText = prepareHTML(raw, p.maxHTMLChars)
+				}
+
+				checks, usage, err := p.vision.analyze(ctx, png, res.Step, p.profile.Name, p.feature, p.checklist, htmlText)
 				report.VisionTokens += usage.PromptTokens
 				if err != nil {
 					report.Status = "FAILED"

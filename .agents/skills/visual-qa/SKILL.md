@@ -66,29 +66,58 @@ against `base_url`:
     { "name": "happy path",
       "steps": [
         { "action": "goto", "url": "/cart" },
-        { "action": "screenshot", "name": "cart-empty" },
+        { "action": "screenshot", "name": "cart-empty", "mode": "full", "html": true },
         { "action": "click", "selector": "#add-to-cart", "capture": true },
-        { "action": "scroll", "to": "bottom", "capture": true }
+        { "action": "scroll", "to": "bottom", "capture": true },
+        { "action": "screenshot", "name": "cart-filled" }
       ] },
     { "name": "empty cart guard",
       "steps": [
         { "action": "goto", "url": "/checkout" },
         { "action": "screenshot", "name": "guard" }
-      ] }
-  ] }
+      ] } ] }
 ```
 
 Actions enum: `goto` (`url`), `click` (`selector`), `type`
 (`selector`, `text`), `scroll` (`to: "top"|"bottom"` **or**
 `selector`), `wait` (`ms` **or** `selector`), `screenshot` (`name`).
 `"capture": true` on click/type/scroll takes a viewport shot after the
-action. Captures are viewport-only in v1 — below-fold content needs
-explicit `scroll` + `screenshot` steps (tall full-page captures get
-squished by the vision model's ~800×800 resize and lose text detail).
+action. Captures are viewport-only by default — below-fold content
+needs explicit `scroll` + `screenshot` steps (tall full-page captures
+get squished by the vision model's ~800×800 resize and lose text
+detail).
 
 The loader is strict: unknown actions/fields, missing names,
 duplicate names, or empty steps exit 2 naming the case/step BEFORE a
 browser launches. Run the flow to confirm a new case parses.
+
+### 3c. Capture modes & HTML evidence
+
+Every capture-capable step (`screenshot`, and click/type/scroll with
+`capture: true`) takes two optional knobs:
+
+- `"mode": "viewport"|"full"` — `viewport` (default) captures the
+  visible frame; `full` captures the whole scrollable page in one
+  image (rod's full-page capture; fixed elements render once at the
+  top). Run-level default: `--capture-mode viewport|full`.
+- `"html": true|false` — sends the sanitized page HTML (scripts,
+  styles, comments stripped; capped at `--max-html-chars`, default
+  30k chars ≈ 7–8k tokens, marked `…[truncated]`) as a text block
+  alongside the image, so the model verifies structural evidence the
+  downscaled image can't show (element sizes, labels, aria, alt,
+  hrefs). Run-level default: `--with-html`.
+
+Per-step values override run-level defaults. Full-page captures are
+downscaled to fit the vision API's 8192 px-per-side limit before
+sending.
+
+**Capture mode changes findings** — proven live (2026-08-27, bot
+dashboards): the same flow in viewport vs full+HTML moved verdicts
+from 68/7/37 to 49/9/27 (PASS/FAIL/UNCERTAIN), with a different FAIL
+set per page. The HTML channel also raises cost to ~9k tokens/step.
+Pick the mode per step based on what the finding must answer:
+viewport shows what the user sees; full+HTML shows the whole page
+with structural precision.
 
 ### 3b. Choosing a checklist (the library)
 
@@ -149,6 +178,12 @@ Check the run's screenshots and step order before trusting a FAIL.
   `--max-screenshots`, `--timeout`, `--retries` (defaults
   15 / 12 / 5m / 3). A run that exceeds a cap aborts and marks the
   run FAILED.
+- Capture/HTML flags: `--capture-mode viewport|full` (default
+  viewport), `--with-html`, `--max-html-chars` (default 30k). HTML
+  raises per-step cost to ~9k tokens — budget `--timeout` and retries
+  accordingly.
+- The vision API hard-rejects images with a side > 8192px; full-page
+  captures are downscaled to fit automatically.
 - The API key goes ONLY in the Authorization header — never in
   prompts, logs, or reports.
 - Screenshots may contain sensitive UI — they stay under the

@@ -110,21 +110,29 @@ Every checklist item must appear exactly once. Verify each item against what is 
 Checklist:
 %s`
 
+// htmlEvidenceSentence is appended to the system prompt only when page HTML
+// is included in the request (US8 AC4).
+const htmlEvidenceSentence = "\nPage HTML is provided in the user message. Use it for structural evidence the screenshot cannot show (element sizes, labels, aria, alt, hrefs) — but judge visual appearance only from the screenshot."
+
 const reaskSuffix = "\nYour previous response was invalid. Return ONLY the JSON object, no markdown, in this shape: {\"checks\":[{\"item\":\"...\",\"verdict\":\"PASS|FAIL|UNCERTAIN\",\"reason\":\"...\"}]}."
 
 // maxChecksPerStep caps the parsed response so a runaway model can't flood
 // the report; the device "all" checklists (28 items) fit comfortably.
 const maxChecksPerStep = 32
 
-// analyze sends one screenshot to the vision model and returns the parsed
-// checks. Malformed responses go through the ladder: local repair → one
-// re-ask → a single UNCERTAIN fallback (never a hard crash).
-func (c *visionClient) analyze(ctx context.Context, png []byte, step, device, feature, checklist string) ([]checkResult, visionUsage, error) {
+// analyze sends one screenshot (plus optional page HTML) to the vision model
+// and returns the parsed checks. Malformed responses go through the ladder:
+// local repair → one re-ask → a single UNCERTAIN fallback (never a hard
+// crash). html is the sanitized page markup (US8); empty means none.
+func (c *visionClient) analyze(ctx context.Context, png []byte, step, device, feature, checklist, html string) ([]checkResult, visionUsage, error) {
 	var usage visionUsage
 	system := fmt.Sprintf(systemPromptTemplate, checklist)
+	if html != "" {
+		system += htmlEvidenceSentence
+	}
 	userText := fmt.Sprintf("Screenshot from a %s viewport, step %q of %q.", device, step, feature)
 
-	resp, err := c.chatOnce(ctx, png, userText, system)
+	resp, err := c.chatOnce(ctx, png, userText, html, system)
 	if err != nil {
 		return nil, usage, err
 	}
@@ -138,8 +146,8 @@ func (c *visionClient) analyze(ctx context.Context, png []byte, step, device, fe
 			return checks, usage, nil
 		}
 	}
-	// one re-ask
-	resp2, err := c.chatOnce(ctx, png, userText+reaskSuffix, system)
+	// one re-ask — the HTML evidence stays in the retry
+	resp2, err := c.chatOnce(ctx, png, userText+reaskSuffix, html, system)
 	if err != nil {
 		return nil, usage, err
 	}
@@ -163,17 +171,23 @@ func addUsage(u *visionUsage, r *chatResponse) {
 }
 
 // chatOnce performs the HTTP call with retry/backoff on retryable errors.
-func (c *visionClient) chatOnce(ctx context.Context, png []byte, userText, system string) (*chatResponse, error) {
+// html (when non-empty) is appended as a final text content block so the
+// model can read structure the image cannot show.
+func (c *visionClient) chatOnce(ctx context.Context, png []byte, userText, html, system string) (*chatResponse, error) {
+	content := []contentPart{
+		{Type: "text", Text: userText},
+		{Type: "image_url", ImageURL: &imageURL{
+			URL: "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
+		}},
+	}
+	if html != "" {
+		content = append(content, contentPart{Type: "text", Text: "Page HTML:\n" + html})
+	}
 	body := chatRequest{
 		Model: c.model,
 		Messages: []chatMessage{
 			{Role: "system", Content: []contentPart{{Type: "text", Text: system}}},
-			{Role: "user", Content: []contentPart{
-				{Type: "text", Text: userText},
-				{Type: "image_url", ImageURL: &imageURL{
-					URL: "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
-				}},
-			}},
+			{Role: "user", Content: content},
 		},
 		ResponseFormat: responseFormat{Type: "json_object"},
 		// 8192: the model spends 2k-4k tokens in reasoning_content before the
