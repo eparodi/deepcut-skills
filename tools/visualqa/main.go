@@ -42,6 +42,9 @@ func run(args []string) int {
 	captureModeFlag := fs.String("capture-mode", "viewport", "capture default: viewport | full (per-step mode overrides)")
 	withHTMLFlag := fs.Bool("with-html", false, "send sanitized page HTML with each capture (per-step html overrides)")
 	maxHTMLCharsFlag := fs.Int("max-html-chars", 30000, "cap on the HTML sent per step, 0 = no cap")
+	cookieFlag := fs.String("cookie", "", "auth cookie name=value to inject before navigation (US9)")
+	exploreFlag := fs.Bool("explore", false, "autonomous exploration loop from --url (US10)")
+	testEnvFlag := fs.Bool("test-env", false, "unlock type/form-filling in exploration (test instances only)")
 	if err := fs.Parse(args); err != nil {
 		return exitValidation
 	}
@@ -57,6 +60,14 @@ func run(args []string) int {
 	}
 	if *captureModeFlag != "viewport" && *captureModeFlag != "full" {
 		fmt.Fprintf(os.Stderr, "unknown capture-mode %q (viewport | full)\n", *captureModeFlag)
+		return exitValidation
+	}
+	if *exploreFlag && *flowFlag != "" {
+		fmt.Fprintln(os.Stderr, "usage: --explore uses --url, not --flow")
+		return exitValidation
+	}
+	if *exploreFlag && *urlFlag == "" {
+		fmt.Fprintln(os.Stderr, "usage: --explore requires --url (the start page)")
 		return exitValidation
 	}
 
@@ -86,6 +97,9 @@ func run(args []string) int {
 				execCases = append(execCases, execCase{name: f.Cases[i].Name, steps: f.Cases[i].Steps})
 			}
 		}
+	} else if *exploreFlag {
+		feature = "explore"
+		target = *urlFlag
 	} else {
 		execCases = []execCase{{
 			name: "one-shot",
@@ -108,6 +122,14 @@ func run(args []string) int {
 		return exitValidation
 	}
 	model := resolveModel(*modelFlag, os.Getenv("DEEPSEEK_VISION_MODEL"), fileVals["DEEPSEEK_VISION_MODEL"])
+
+	cookie := resolveCookie(*cookieFlag, os.Getenv("VISUALQA_COOKIE"), fileVals["VISUALQA_COOKIE"])
+	if cookie != "" {
+		if _, _, err := parseCookie(cookie); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitValidation
+		}
+	}
 
 	checklist := *checklistFlag
 	if strings.HasPrefix(checklist, "@") {
@@ -152,6 +174,9 @@ func run(args []string) int {
 		captureMode:    *captureModeFlag,
 		withHTML:       *withHTMLFlag,
 		maxHTMLChars:   *maxHTMLCharsFlag,
+		explore:        *exploreFlag,
+		testEnv:        *testEnvFlag,
+		cookie:         cookie,
 	})
 }
 
@@ -175,6 +200,9 @@ type executeParams struct {
 	captureMode    string
 	withHTML       bool
 	maxHTMLChars   int
+	explore        bool
+	testEnv        bool
+	cookie         string
 }
 
 // captureModeFor resolves a step's capture mode: a per-step mode wins, else
@@ -236,6 +264,26 @@ func execute(ctx context.Context, p executeParams) int {
 		}
 	}()
 	report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
+
+	// US9: inject the auth cookie before ANY navigation so flows and
+	// exploration reach authenticated pages without the login UI.
+	if p.cookie != "" {
+		targetURL := p.url
+		if p.flow != nil {
+			targetURL = p.flow.BaseURL
+		}
+		name, value, _ := parseCookie(p.cookie) // validated in run()
+		if err := sess.injectCookie(name, value, originOf(targetURL)); err != nil {
+			fmt.Fprintf(os.Stderr, "cookie: %v\n", err)
+			report.Status = "FAILED"
+			report.FailReason = "cookie injection failed: " + err.Error()
+			return exitProvider
+		}
+	}
+
+	if p.explore {
+		return runExplore(ctx, sess, p, report, dir)
+	}
 
 	stepsRun := 0
 	shots := 0
@@ -334,6 +382,116 @@ func execute(ctx context.Context, p executeParams) int {
 	report.Screenshots = shots
 	report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 
+	fmt.Fprintf(os.Stderr, "report: %s/report.md\n", dir)
+	return exitOK
+}
+
+// runExplore is the autonomous loop (US10): capture → vision grades the
+// page AND proposes the next action → validate → execute → repeat. Bounded
+// by the same step/screenshot/timeout caps as flows. HTML is ALWAYS included
+// (the model needs the DOM for selectors). A 400ms settle follows each
+// action so the next capture shows the post-navigation state.
+func runExplore(ctx context.Context, sess *browserSession, p executeParams, report *runReport, dir string) int {
+	origin := originOf(p.url)
+	stepsRun := 0
+	shots := 0
+	var prev *nextAction
+
+	// Navigate to the start page BEFORE the loop — the first capture must
+	// show the app, not about:blank.
+	if err := sess.execStep(flowStep{Action: "goto", URL: p.url}); err != nil {
+		report.Status = "FAILED"
+		report.FailReason = "explore start navigation: " + err.Error()
+		return exitProvider
+	}
+	time.Sleep(400 * time.Millisecond)
+
+	for {
+		stepsRun++
+		if stepsRun > p.maxSteps {
+			report.Status = "FAILED"
+			report.FailReason = fmt.Sprintf("budget exceeded: %d steps (> %d)", stepsRun, p.maxSteps)
+			return exitBudget
+		}
+		if err := ctx.Err(); err != nil {
+			report.Status = "FAILED"
+			report.FailReason = "timeout: " + err.Error()
+			return exitBudget
+		}
+
+		shots++
+		if shots > p.maxScreenshots {
+			report.Status = "FAILED"
+			report.FailReason = fmt.Sprintf("budget exceeded: %d screenshots (> %d)", shots, p.maxScreenshots)
+			report.Steps = stepsRun
+			return exitBudget
+		}
+		fmt.Fprintf(os.Stderr, "[%d/%d] explore step %d\n", stepsRun, p.maxSteps, stepsRun)
+
+		res := stepResult{Case: "explore", Step: fmt.Sprintf("explore %d", stepsRun)}
+		file, png, err := sess.capture(dir, fmt.Sprintf("explore-%d", stepsRun), p.captureMode == "full", p.profile.DPR)
+		if err != nil {
+			res.Error = "capture: " + err.Error()
+			report.Status = "FAILED"
+			report.FailReason = res.Error
+			report.StepResults = append(report.StepResults, res)
+			report.Steps = stepsRun
+			return exitProvider
+		}
+		res.Screenshot = file
+
+		htmlText := ""
+		if raw, err := sess.pageHTML(); err == nil {
+			htmlText = prepareHTML(raw, p.maxHTMLChars)
+		} else {
+			report.Diagnostics = append(report.Diagnostics, "explore: html fetch failed: "+err.Error())
+		}
+
+		explored, usage, err := p.vision.analyzeExplore(ctx, png, res.Step, p.profile.Name, p.feature, p.checklist, htmlText, p.testEnv)
+		report.VisionTokens += usage.PromptTokens
+		if err != nil {
+			report.Status = "FAILED"
+			report.FailReason = "vision: " + err.Error()
+			report.StepResults = append(report.StepResults, res)
+			report.Steps = stepsRun
+			return exitProvider
+		}
+		res.Checks = explored.Checks
+		action := explored.NextAction
+		if action != nil {
+			res.Step = fmt.Sprintf("explore %d (%s)", stepsRun, action.describe())
+		}
+		report.StepResults = append(report.StepResults, res)
+		report.Steps = stepsRun
+
+		if action == nil {
+			report.Diagnostics = append(report.Diagnostics, "exploration ended: model returned no next action")
+			break
+		}
+		if err := validateNextAction(action, p.testEnv); err != nil {
+			report.Diagnostics = append(report.Diagnostics, "exploration ended: invalid action: "+err.Error())
+			break
+		}
+		if antiLoop(prev, action) {
+			report.Diagnostics = append(report.Diagnostics, "exploration ended: repeated action "+action.describe())
+			break
+		}
+		if action.Type == exploreDone {
+			break
+		}
+		if action.Type == exploreGoto && !sameOrigin(origin, action.URL) {
+			report.Diagnostics = append(report.Diagnostics, "exploration ended: goto leaves the origin: "+action.URL)
+			break
+		}
+		if err := sess.execStep(flowStepFromAction(action, origin)); err != nil {
+			report.Diagnostics = append(report.Diagnostics, "exploration ended: action failed: "+err.Error())
+			break
+		}
+		time.Sleep(400 * time.Millisecond)
+		prev = action
+	}
+	report.Screenshots = shots
+	report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 	fmt.Fprintf(os.Stderr, "report: %s/report.md\n", dir)
 	return exitOK
 }

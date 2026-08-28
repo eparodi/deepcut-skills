@@ -17,6 +17,7 @@ Visual QA — drives headless Chrome via tools/visualqa with DeepSeek vision: on
   - [2. Flow verification](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#2-flow-verification)
   - [3. Authoring a new feature or case (the JSON contract)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#3-authoring-a-new-feature-or-case-the-json-contract)
   - [3c. Capture modes & HTML evidence](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#3c-capture-modes--html-evidence)
+  - [3d. Authenticated exploration (cookie + autonomous loop)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#3d-authenticated-exploration-cookie--autonomous-loop)
   - [3b. Choosing a checklist (the library)](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#3b-choosing-a-checklist-the-library)
   - [4. Interpreting verdicts](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#4-interpreting-verdicts)
 - [Interpreting verdicts — context matters](https://github.com/eparodi/deepcut-skills/blob/main/.agents/skills/visual-qa/SKILL.md#interpreting-verdicts--context-matters)

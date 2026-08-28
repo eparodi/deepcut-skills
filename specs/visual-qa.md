@@ -223,6 +223,52 @@ show (element sizes in px, labels, aria, alt, hrefs).
   system prompt has instructed it to use the HTML for structural
   evidence the screenshot cannot show.
 
+### User Story 9: Inject an auth cookie (stateless session)
+
+As a QA operator, I want to inject a signed `session=<token>` cookie
+into the browser session, so flows and exploration reach
+authenticated pages without the login UI (the dashboard uses
+stateless HMAC-signed session tokens — `auth.SessionCookieName` in
+the bot repo — which the operator mints externally).
+
+**Acceptance Criteria:**
+- Given `--cookie "session=<token>"` (precedence: flag >
+  `VISUALQA_COOKIE` env > `.env.visualqa` line), When the browser
+  session starts, Then the cookie is set on the target origin before
+  the first navigation (rod `page.MustSetCookies`).
+- Given a malformed cookie (no `=`, empty name), When the run starts,
+  Then it exits 2 before a browser launches.
+- Given cookie injection is active, When the run completes, Then the
+  cookie value never appears in reports, logs, or diagnostics — it
+  lives only in the CDP session.
+
+### User Story 10: Autonomous exploration (reverses VQ-1)
+
+As a QA operator, I want the vision model to drive the browser
+through the authenticated app on its own — clicking, scrolling,
+navigating within the origin — grading each visited page against the
+checklist, so pages I didn't hand-author get covered.
+
+**Acceptance Criteria:**
+- Given `--explore --url <start>`, When the run starts, Then it
+  navigates to the start page and loops: screenshot+HTML → model
+  returns `{checks, next_action}` → execute → repeat, bounded by the
+  existing `--max-steps` / `--max-screenshots` / `--timeout` caps.
+- Given the model's proposed action, When executed, Then only the
+  bounded vocabulary runs: `click <selector>` ·
+  `scroll top|bottom|<selector>` · `back` · `goto <relative-url>` ·
+  `done` — plus `type <selector> <text>` only when `--test-env` is
+  set. Anything else ends the loop with a diagnostic.
+- Given a `goto` whose resolved URL leaves the target origin, When
+  proposed, Then it is rejected (same-origin only).
+- Given the identical `(action, target)` twice in a row, When
+  proposed, Then the loop ends with a diagnostic (anti-loop guard).
+- Given an unparseable/invalid model response, When in the loop, Then
+  it goes through the vision ladder (one re-ask → loop ends with a
+  diagnostic) — never a crash.
+- Given the loop ends, Then the report records each step (page, chosen
+  action, screenshot) plus the per-page checklist findings.
+
 ## Non-Goals
 
 - ❌ Real-device or emulator testing (physical phones/tablets are
@@ -230,8 +276,6 @@ show (element sizes in px, labels, aria, alt, hrefs).
 - ❌ Cross-browser matrix — v1 drives Chrome/Chromium only.
 - ❌ Pixel-diff / golden-image comparison — verdicts are LLM-based in
   v1 (a future `--diff` mode could compare two runs byte-wise; VQ-3).
-- ❌ Autonomous exploration loops in v1 — the model never chooses its
-  own next action (VQ-1).
 - ❌ CI wiring — the tool runs locally on demand (VQ-4).
 - ❌ Fixing what it finds — the tool reports; a human or another agent
   fixes.
@@ -248,12 +292,19 @@ show (element sizes in px, labels, aria, alt, hrefs).
   cost control (US8 AC2).
 - ❌ Report/findings schema changes for capture mode — mode stays
   visible in the flow file and screenshot files; no new report fields.
+- ❌ Cross-origin navigation in exploration — same-origin only (US10
+  AC3), which bounds both safety and the prompt-injection surface.
+- ❌ Cookie values inside flow JSON files — they are credentials;
+  carrier is the flag/env/gitignored `.env.visualqa` (US9 AC3).
+- ❌ `type`/form-filling in exploration without `--test-env` — the
+  default vocabulary is read-mostly; `--test-env` unlocks typing for
+  disposable test instances and explicitly allows state mutation
+  (operator's call per environment).
+- ❌ Exploration against live/production state — the skill documents
+  that `--explore` targets the offline/fake QA instance.
 
 ## Follow-ups (recorded, not in v1)
 
-- **VQ-1** Vision-driven autonomous loop: model picks the next action
-  from the screenshot (needs a bounded action vocabulary + loop
-  budget before it can ship).
 - **VQ-2** Multi-project split: give `tools/visualqa` its own `go.mod`
   so the wiki tool's dependency tree stays rod-free.
 - **VQ-3** `--diff` pixel/byte comparison between two runs.
@@ -306,7 +357,8 @@ go run ./tools/visualqa \
   [--out artifacts/visualqa] \
   [--max-steps 15] [--max-screenshots 12] \
   [--timeout 5m] [--retries 3] [--model deepseek-v4-flash-vision-exp] \
-  [--capture-mode viewport|full] [--with-html] [--max-html-chars 30000]
+  [--capture-mode viewport|full] [--with-html] [--max-html-chars 30000] \
+  [--cookie "session=<token>"] [--explore] [--test-env]
 ```
 
 - `--url` and `--flow` are mutually exclusive (one-shot vs flow mode).
@@ -323,6 +375,12 @@ go run ./tools/visualqa \
   (`viewport`); `--with-html` turns on HTML evidence at run level;
   `--max-html-chars` caps the HTML sent per step (default 30,000
   chars ≈ 7–8k tokens). Per-step `mode`/`html` fields override these.
+- `--cookie "session=<token>"` injects an auth cookie before the
+  first navigation (US9). Precedence: flag > `VISUALQA_COOKIE` env >
+  `.env.visualqa` line. `--explore` starts the autonomous loop from
+  `--url` (US10) and is mutually exclusive with `--flow`.
+  `--test-env` unlocks `type` in the exploration vocabulary (state
+  mutation allowed — test instances only).
 
 ### Flow schema (the authoring contract)
 
@@ -403,6 +461,44 @@ Validation rules (enforced by `flow.go`, pinned by tests):
 - Relative `goto` URLs resolve against `base_url`; absolute URLs pass
   through.
 - `--case <name>` selects one case; unknown name = validation error.
+
+### Session cookie & autonomous exploration (US9/US10)
+
+**Cookie (US9):** resolved flag > `VISUALQA_COOKIE` env >
+`.env.visualqa` line (same precedence as the API key), parsed as
+`name=value` (first `=` splits; empty name = validation error),
+injected after the browser opens and before the first navigation via
+`page.MustSetCookies(&proto.NetworkCookieParam{Name, Value, URL:
+<origin>})` — the origin of the target URL (base_url for flows, the
+`--url` for one-shot/explore). The value is never logged, printed, or
+written to reports.
+
+**Exploration (US10):** `--explore --url <start>` runs the loop:
+capture (mode from `--capture-mode`, default viewport; HTML **always**
+included — the model needs the DOM for selectors) → one vision call
+returns BOTH the checklist verdicts AND `next_action` → validate
+(vocabulary, required args, same-origin, anti-loop) → execute →
+repeat. Response shape:
+
+```json
+{"checks": [{"item": "...", "verdict": "PASS|FAIL|UNCERTAIN", "reason": "..."}],
+ "next_action": {"type": "click|scroll|back|goto|done", "selector": "...", "to": "...", "url": "..."}}
+```
+
+- Vocabulary: `click <selector>`, `scroll to|selector`, `back`,
+  `goto <relative-url>` (resolved against the start origin; anything
+  leaving it is rejected), `done`; `type <selector> <text>` only with
+  `--test-env`. Unknown type or missing required arg → vision ladder
+  (one re-ask → loop ends with a diagnostic).
+- Anti-loop: the identical `(type, target)` as the immediately
+  previous step ends the loop with a diagnostic.
+- Budgets: the loop consumes the same `--max-steps` /
+  `--max-screenshots` / `--timeout` caps as flows.
+- Explorer system prompt: bounded vocabulary, same-origin rule, and
+  the page-content-is-data sentence (skills-test AGENTS.md §10.61);
+  the `type` line is appended only with `--test-env`.
+- Cost: HTML per step ≈ 9k tokens; the explore default checklist is
+  the quick 8-item one (overridable with `--checklist`).
 
 ### Device presets
 
@@ -665,6 +761,28 @@ feature (VQ-2 keeps them apart later).
   dependency markers to direct. Retro:
   `specs/memories/2026-08-28-visual-qa-full-page-html-retro.md`.
 
+- **2026-08-28 (US9/US10 — cookie injection + autonomous
+  exploration):** `--cookie "name=value"` (flag > `VISUALQA_COOKIE`
+  env > `.env.visualqa` line) injects via
+  `page.MustSetCookies(&proto.NetworkCookieParam{Name, Value, URL:
+  origin})` before the first navigation. `--explore --url <start>`
+  loops: capture → one vision call returns checks AND `next_action`
+  (bounded vocabulary: click/scroll/back/goto/done; `type` gated
+  behind `--test-env` per the operator's "test environment = do
+  whatever you want") → validate (vocabulary, args, same-origin,
+  anti-loop) → execute → repeat. Two live-validation fixes:
+  (1) the loop initially captured `about:blank` — the start URL
+  navigation was missing and had to run before the first capture;
+  (2) `json.Decoder.Decode` silently ignores trailing content, so
+  both `parseChecks` and `parseExploreResponse` now require the
+  decoder to hit EOF (a `next_action` with garbage after it must not
+  parse). Live run against the offline bot dashboard with a minted
+  `session` cookie: authed dashboard (no login UI) → model clicked a
+  details link, scrolled, clicked the trades nav link, then `done` —
+  31 PASS / 0 FAIL / 1 UNCERTAIN over 3 pages, clean diagnostics.
+  The QA instance's `.env` now pins a `SESSION_SECRET` so tokens can
+  be minted deterministically for future runs.
+
 ## Task Checklist (Phase 3)
 
 1. [x] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold
@@ -781,3 +899,44 @@ feature (VQ-2 keeps them apart later).
     downscaled within 1px of fit with aspect preserved; invalid PNG
     errors — red first
     → Satisfies: US7 AC3 (revised behavior, see Implementation Notes)
+
+18. [x] (Tooling) `env.go` + `main.go` — cookie resolution
+    (flag > `VISUALQA_COOKIE` env > `.env.visualqa`) + `name=value`
+    validation
+    → Tests: precedence; malformed (no `=`, empty name) rejected — red
+    first
+    → Satisfies: US9 AC1–AC2
+
+19. [x] (Tooling) `browser.go` — cookie injection via
+    `page.MustSetCookies` before the first navigation (origin from
+    base URL / `--url`); `back` action for exploration
+    → Tests: pure origin-derivation helper; injection + back exercised
+    in the live validation (task 23)
+    → Satisfies: US9 AC1, US10 AC1
+
+20. [x] (Tooling) `explore.go` + `explore_test.go` — loop
+    orchestrator: `next_action` schema + validation (vocabulary,
+    required args), same-origin guard, anti-loop, ladder reuse
+    → Tests: valid actions; unknown type; missing arg; external URL
+    rejected; repeated-action guard; `done` ends the loop — red first
+    → Satisfies: US10 AC2–AC5
+
+21. [x] (Tooling) `vision.go` + `vision_test.go` — explorer system
+    prompt (bounded vocabulary + page-content-is-data + `type` only
+    with `--test-env`) + `next_action` parsing
+    → Tests: explorer prompt includes vocabulary; `type` absent
+    without `--test-env`; `next_action` parsed; checks still parsed —
+    red first
+    → Satisfies: US10 AC2, US10 AC5
+
+22. [x] (Tooling) `main.go` — `--explore`, `--test-env`, `--cookie`
+    wiring; `--explore` requires `--url` and rejects `--flow`
+    → Test: explore+flow exits 2; explore without url exits 2 — red
+    first
+    → Satisfies: US10 AC1
+
+23. [x] (Live) explore run against the offline bot dashboard with a
+    minted `session` cookie (operator mints the token); record the
+    exploration path + findings diff vs the hand-authored flow
+    → Run by the operator; record in Implementation Notes
+    → Satisfies: US9/US10 end-to-end

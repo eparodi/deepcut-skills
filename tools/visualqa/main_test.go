@@ -35,6 +35,9 @@ func TestRunValidationErrors(t *testing.T) {
 		{"unknown case", []string{"--flow", validFlowPath, "--case", "nope"}, exitValidation},
 		{"unknown flag", []string{"--url", "http://x", "--bogus", "1"}, exitValidation},
 		{"bad capture mode", []string{"--url", "http://x", "--capture-mode", "wide"}, exitValidation},
+		{"explore with flow", []string{"--flow", "f.json", "--explore", "--url", "http://x"}, exitValidation},
+		{"explore without url", []string{"--explore"}, exitValidation},
+		{"bad cookie", []string{"--url", "http://x", "--cookie", "novalue"}, exitValidation},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
