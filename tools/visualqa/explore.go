@@ -96,6 +96,30 @@ func parseExploreResponse(text string) (*exploreResponse, error) {
 	return &vr, nil
 }
 
+// parseNextAction strictly parses an action-only nudge response (the salvage
+// path in analyzeExplore): the checks were accepted, only the action is
+// asked for. Same strictness: one value, no trailing content.
+func parseNextAction(text string) (*nextAction, error) {
+	var vr struct {
+		NextAction *nextAction `json:"next_action"`
+	}
+	dec := json.NewDecoder(bytes.NewReader([]byte(text)))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&vr); err != nil {
+		return nil, err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return nil, errors.New("trailing content after JSON")
+	}
+	if vr.NextAction == nil {
+		return nil, errors.New("no next_action in response")
+	}
+	if err := validateNextAction(vr.NextAction, true); err != nil {
+		return nil, err
+	}
+	return vr.NextAction, nil
+}
+
 // validateNextAction enforces the vocabulary and per-action required args.
 // testEnv gates the "type" (form-filling) action: without --test-env the
 // model may only navigate and read (US10 AC2).

@@ -136,6 +136,15 @@ Checklist:
 // --test-env, unlocking form-filling on disposable test instances (US10 AC2).
 const exploreTypePromptLine = `{"next_action": {"type": "type", "selector": "<css selector>", "text": "<text to type>"}}`
 
+// exploreReaskSuffix is the explore-mode re-ask: unlike the plain QA reask it
+// demands next_action too — a re-ask that never asks for the action cannot
+// fix a missing one.
+const exploreReaskSuffix = "\nYour previous response was invalid. Return ONLY the JSON object: {\"checks\":[{\"item\":\"...\",\"verdict\":\"PASS|FAIL|UNCERTAIN\",\"reason\":\"...\"}],\"next_action\":{\"type\":\"click|scroll|back|goto|done\",\"selector\":\"...\",\"to\":\"...\",\"url\":\"...\"}}."
+
+// actionOnlySuffix salvages a page whose checks parsed but whose action is
+// missing: one targeted call asks for ONLY the action.
+const actionOnlySuffix = "\nThe page checks you provided were accepted. Reply ONLY with the next action object, no checks: {\"next_action\": {\"type\": \"click|scroll|back|goto|done\", \"selector\": \"...\", \"to\": \"...\", \"url\": \"...\"}}."
+
 const reaskSuffix = "\nYour previous response was invalid. Return ONLY the JSON object, no markdown, in this shape: {\"checks\":[{\"item\":\"...\",\"verdict\":\"PASS|FAIL|UNCERTAIN\",\"reason\":\"...\"}]}."
 
 // maxChecksPerStep caps the parsed response so a runaway model can't flood
@@ -187,8 +196,11 @@ func (c *visionClient) analyze(ctx context.Context, png []byte, step, device, fe
 // analyzeExplore is the autonomous-loop vision call (US10): one call returns
 // BOTH the checklist verdicts and the next action. HTML is always included
 // (the model needs the DOM for selectors). testEnv gates the type action in
-// the prompt. Unparseable responses follow the same ladder as analyze.
-func (c *visionClient) analyzeExplore(ctx context.Context, png []byte, step, device, feature, checklist, html string, testEnv bool) (*exploreResponse, visionUsage, error) {
+// the prompt; visited lists the pages already seen so the model prefers
+// unvisited ones. The ladder: strict parse → local repair → full re-ask
+// (suffix demands next_action) → action-only salvage when the checks parsed
+// but the action is missing → UNCERTAIN fallback (loop ends).
+func (c *visionClient) analyzeExplore(ctx context.Context, png []byte, step, device, feature, checklist, html string, testEnv bool, visited string) (*exploreResponse, visionUsage, error) {
 	var usage visionUsage
 	typeLine := ""
 	if testEnv {
@@ -196,6 +208,9 @@ func (c *visionClient) analyzeExplore(ctx context.Context, png []byte, step, dev
 	}
 	system := fmt.Sprintf(explorerPromptTemplate, typeLine, checklist)
 	userText := fmt.Sprintf("Screenshot from a %s viewport, exploring %q of %q.", device, step, feature)
+	if visited != "" {
+		userText += "\n" + visited
+	}
 
 	resp, err := c.chatOnce(ctx, png, userText, html, system)
 	if err != nil {
@@ -211,8 +226,8 @@ func (c *visionClient) analyzeExplore(ctx context.Context, png []byte, step, dev
 			return parsed, usage, nil
 		}
 	}
-	// one re-ask — the HTML evidence stays in the retry
-	resp2, err := c.chatOnce(ctx, png, userText+reaskSuffix, html, system)
+	// one full re-ask — the suffix demands next_action
+	resp2, err := c.chatOnce(ctx, png, userText+exploreReaskSuffix, html, system)
 	if err != nil {
 		return nil, usage, err
 	}
@@ -220,11 +235,33 @@ func (c *visionClient) analyzeExplore(ctx context.Context, png []byte, step, dev
 	if parsed, err := parseExploreResponse(resp2.content()); err == nil {
 		return parsed, usage, nil
 	}
+	// salvage: the page checks parsed but the action is missing — ask for
+	// ONLY the action, then combine.
+	for _, candidate := range []string{resp2.content(), repairJSON(resp2.content())} {
+		checks, err := parseChecks(candidate)
+		if err != nil {
+			continue
+		}
+		resp3, err := c.chatOnce(ctx, png, userText+actionOnlySuffix, html, system)
+		if err != nil {
+			return nil, usage, err
+		}
+		addUsage(&usage, resp3)
+		if a, err := parseNextAction(resp3.content()); err == nil {
+			return &exploreResponse{Checks: checks, NextAction: a}, usage, nil
+		}
+		if repaired := repairJSON(resp3.content()); repaired != resp3.content() {
+			if a, err := parseNextAction(repaired); err == nil {
+				return &exploreResponse{Checks: checks, NextAction: a}, usage, nil
+			}
+		}
+		break
+	}
 	return &exploreResponse{
 		Checks: []checkResult{{
 			Item:    "vision-parse",
 			Verdict: "UNCERTAIN",
-			Reason:  "unparseable explorer response after local repair and one re-ask",
+			Reason:  "unparseable explorer response after repair, re-ask and action salvage",
 		}},
 	}, usage, nil
 }
@@ -257,10 +294,12 @@ func (c *visionClient) chatOnce(ctx context.Context, png []byte, userText, html,
 			{Role: "user", Content: content},
 		},
 		ResponseFormat: responseFormat{Type: "json_object"},
-		// 8192: the model spends 2k-4k tokens in reasoning_content before the
-		// checks; 4096 was exhausted by reasoning alone, returning empty
-		// content (observed 2026-08-27 on the 28-item mobile checklist).
-		MaxTokens: 8192,
+		// 12000: the model spends 2k-4k+ tokens in reasoning_content before the
+		// checks; 8192 was tight for the 28-item checklist + next_action, and
+		// truncated responses exhausted the explorer ladder (observed
+		// 2026-08-28). The model's documented max output is 384K, so 12000 is
+		// comfortably inside the API limit.
+		MaxTokens: 12000,
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {

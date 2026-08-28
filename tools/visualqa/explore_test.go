@@ -45,6 +45,42 @@ func TestParseExploreResponse(t *testing.T) {
 	}
 }
 
+func TestParseNextAction(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		wantT   string
+		wantErr string
+	}{
+		{"valid click", `{"next_action":{"type":"click","selector":"#settings"}}`, "click", ""},
+		{"valid done", `{"next_action":{"type":"done"}}`, "done", ""},
+		{"missing next_action key", `{"action":{"type":"done"}}`, "", "unknown field"},
+		{"unknown type", `{"next_action":{"type":"hover","selector":"#x"}}`, "", "action"},
+		{"click without selector", `{"next_action":{"type":"click"}}`, "", "selector"},
+		{"trailing garbage", `{"next_action":{"type":"done"}} extra`, "", "trailing"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a, err := parseNextAction(tt.in)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("parseNextAction succeeded, want error")
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error %q does not contain %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseNextAction: %v", err)
+			}
+			if a.Type != tt.wantT {
+				t.Errorf("type = %q, want %q", a.Type, tt.wantT)
+			}
+		})
+	}
+}
+
 func TestNextActionTypeGate(t *testing.T) {
 	base := `{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}],"next_action":{"type":"%s","selector":"#email","text":"hello"}}`
 	// type without testEnv is rejected at validation time

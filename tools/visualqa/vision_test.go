@@ -54,8 +54,8 @@ func (f *fakeOpenAI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if req.ResponseFormat.Type != "json_object" {
 		f.t.Errorf("response_format = %+v, want json_object", req.ResponseFormat)
 	}
-	if req.MaxTokens < 8192 {
-		f.t.Errorf("MaxTokens = %d, want >= 8192 (reasoning_content eats the budget)", req.MaxTokens)
+	if req.MaxTokens < 12000 {
+		f.t.Errorf("MaxTokens = %d, want >= 12000 (reasoning_content + 28 checks + next_action)", req.MaxTokens)
 	}
 
 	f.calls++
@@ -328,7 +328,7 @@ func TestAnalyzeExplorePrompt(t *testing.T) {
 	good := validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}],"next_action":{"type":"click","selector":"#settings"}}`)
 	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: good}})
 
-	resp, usage, err := c.analyzeExplore(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "<html></html>", false)
+	resp, usage, err := c.analyzeExplore(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "<html></html>", false, "")
 	if err != nil {
 		t.Fatalf("analyzeExplore: %v", err)
 	}
@@ -362,10 +362,77 @@ func TestAnalyzeExplorePrompt(t *testing.T) {
 	}
 }
 
+func TestAnalyzeExploreSalvageMissingAction(t *testing.T) {
+	// The model keeps returning checks WITHOUT next_action: the strict parse
+	// fails, the re-ask fails the same way, and an action-only nudge salvages
+	// the page's checks + a valid action (3 calls).
+	checksOnly := validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}]}`)
+	actionOnly := validBody(`{"next_action":{"type":"goto","url":"/settings"}}`)
+	c, fake, _ := newTestClient(t, []fakeResp{
+		{status: 200, body: checksOnly},
+		{status: 200, body: checksOnly},
+		{status: 200, body: actionOnly},
+	})
+	resp, _, err := c.analyzeExplore(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "", false, "")
+	if err != nil {
+		t.Fatalf("analyzeExplore: %v", err)
+	}
+	if len(resp.Checks) != 1 || resp.Checks[0].Verdict != "PASS" {
+		t.Errorf("checks = %+v, want the salvaged page checks", resp.Checks)
+	}
+	if resp.NextAction == nil || resp.NextAction.Type != "goto" || resp.NextAction.URL != "/settings" {
+		t.Errorf("next_action = %+v, want goto /settings from the nudge", resp.NextAction)
+	}
+	if fake.calls != 3 {
+		t.Errorf("calls = %d, want 3 (full + re-ask + action nudge)", fake.calls)
+	}
+}
+
+func TestAnalyzeExploreSalvageExhaustedFallsBack(t *testing.T) {
+	// checks-only twice, then the nudge response is also unparseable -> the
+	// UNCERTAIN fallback with no next_action (loop ends cleanly).
+	checksOnly := validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}]}`)
+	c, fake, _ := newTestClient(t, []fakeResp{
+		{status: 200, body: checksOnly},
+		{status: 200, body: checksOnly},
+		{status: 200, body: validBody(`"not json"`)},
+	})
+	resp, _, err := c.analyzeExplore(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "", false, "")
+	if err != nil {
+		t.Fatalf("analyzeExplore: %v", err)
+	}
+	if len(resp.Checks) != 1 || resp.Checks[0].Verdict != "UNCERTAIN" {
+		t.Errorf("checks = %+v, want the UNCERTAIN fallback", resp.Checks)
+	}
+	if resp.NextAction != nil {
+		t.Errorf("next_action = %+v, want nil (loop ends)", resp.NextAction)
+	}
+	if fake.calls != 3 {
+		t.Errorf("calls = %d, want 3", fake.calls)
+	}
+}
+
+func TestAnalyzeExploreVisitedHint(t *testing.T) {
+	good := validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}],"next_action":{"type":"done"}}`)
+	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: good}})
+	if _, _, err := c.analyzeExplore(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "<html></html>", false, "Pages already visited: /, /trades. Prefer unvisited pages."); err != nil {
+		t.Fatalf("analyzeExplore: %v", err)
+	}
+	user := fake.lastRequest().Messages[len(fake.lastRequest().Messages)-1]
+	text := user.Content[0].Text
+	if !strings.Contains(text, "Pages already visited: /, /trades") {
+		t.Errorf("user text lacks the visited hint: %q", text)
+	}
+	// the hint goes in the FIRST text block; HTML still last
+	if len(user.Content) != 3 || !strings.Contains(user.Content[2].Text, "Page HTML:") {
+		t.Errorf("user content = %d blocks, want 3 with HTML last", len(user.Content))
+	}
+}
+
 func TestAnalyzeExplorePromptTestEnvUnlocksType(t *testing.T) {
 	good := validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}],"next_action":{"type":"done"}}`)
 	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: good}})
-	if _, _, err := c.analyzeExplore(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "", true); err != nil {
+	if _, _, err := c.analyzeExplore(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", "", true, ""); err != nil {
 		t.Fatalf("analyzeExplore: %v", err)
 	}
 	system := fake.lastRequest().Messages[0].Content[0].Text

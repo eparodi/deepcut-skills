@@ -294,11 +294,15 @@ func execute(ctx context.Context, p executeParams) int {
 			if stepsRun > p.maxSteps {
 				report.Status = "FAILED"
 				report.FailReason = fmt.Sprintf("budget exceeded: %d steps (> %d)", stepsRun, p.maxSteps)
+				report.Screenshots = shots
+				report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 				return exitBudget
 			}
 			if err := ctx.Err(); err != nil {
 				report.Status = "FAILED"
 				report.FailReason = "timeout: " + err.Error()
+				report.Screenshots = shots
+				report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 				return exitBudget
 			}
 
@@ -333,6 +337,8 @@ func execute(ctx context.Context, p executeParams) int {
 					report.Status = "FAILED"
 					report.FailReason = fmt.Sprintf("budget exceeded: %d screenshots (> %d)", shots, p.maxScreenshots)
 					report.Steps = stepsRun
+					report.Screenshots = shots - 1
+					report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 					return exitBudget
 				}
 				name := step.Name
@@ -396,6 +402,8 @@ func runExplore(ctx context.Context, sess *browserSession, p executeParams, repo
 	stepsRun := 0
 	shots := 0
 	var prev *nextAction
+	visited := map[string]bool{}
+	visitedList := []string{}
 
 	// Navigate to the start page BEFORE the loop — the first capture must
 	// show the app, not about:blank.
@@ -406,16 +414,27 @@ func runExplore(ctx context.Context, sess *browserSession, p executeParams, repo
 	}
 	time.Sleep(400 * time.Millisecond)
 
+	visitedHint := func() string {
+		if len(visitedList) == 0 {
+			return ""
+		}
+		return "Pages already visited: " + strings.Join(visitedList, ", ") + ". Prefer actions that reach unvisited pages."
+	}
+
 	for {
 		stepsRun++
 		if stepsRun > p.maxSteps {
 			report.Status = "FAILED"
 			report.FailReason = fmt.Sprintf("budget exceeded: %d steps (> %d)", stepsRun, p.maxSteps)
+			report.Screenshots = shots
+			report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 			return exitBudget
 		}
 		if err := ctx.Err(); err != nil {
 			report.Status = "FAILED"
 			report.FailReason = "timeout: " + err.Error()
+			report.Screenshots = shots
+			report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 			return exitBudget
 		}
 
@@ -424,6 +443,8 @@ func runExplore(ctx context.Context, sess *browserSession, p executeParams, repo
 			report.Status = "FAILED"
 			report.FailReason = fmt.Sprintf("budget exceeded: %d screenshots (> %d)", shots, p.maxScreenshots)
 			report.Steps = stepsRun
+			report.Screenshots = shots - 1
+			report.Diagnostics = append(report.Diagnostics, sess.diagnostics()...)
 			return exitBudget
 		}
 		fmt.Fprintf(os.Stderr, "[%d/%d] explore step %d\n", stepsRun, p.maxSteps, stepsRun)
@@ -447,7 +468,7 @@ func runExplore(ctx context.Context, sess *browserSession, p executeParams, repo
 			report.Diagnostics = append(report.Diagnostics, "explore: html fetch failed: "+err.Error())
 		}
 
-		explored, usage, err := p.vision.analyzeExplore(ctx, png, res.Step, p.profile.Name, p.feature, p.checklist, htmlText, p.testEnv)
+		explored, usage, err := p.vision.analyzeExplore(ctx, png, res.Step, p.profile.Name, p.feature, p.checklist, htmlText, p.testEnv, visitedHint())
 		report.VisionTokens += usage.PromptTokens
 		if err != nil {
 			report.Status = "FAILED"
@@ -488,6 +509,10 @@ func runExplore(ctx context.Context, sess *browserSession, p executeParams, repo
 			break
 		}
 		time.Sleep(400 * time.Millisecond)
+		if pth, err := sess.currentPath(); err == nil && pth != "" && !visited[pth] {
+			visited[pth] = true
+			visitedList = append(visitedList, pth)
+		}
 		prev = action
 	}
 	report.Screenshots = shots

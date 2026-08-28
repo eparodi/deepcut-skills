@@ -783,6 +783,24 @@ feature (VQ-2 keeps them apart later).
   The QA instance's `.env` now pins a `SESSION_SECRET` so tokens can
   be minted deterministically for future runs.
 
+- **2026-08-28 (exploration reliability, live evidence):** three
+  iteration fixes from live explore runs with the full 28-item
+  checklist. (1) The model replied `done` after one page — the
+  explorer prompt now directs app-wide coverage ("prefer actions that
+  reach NEW pages; reply done only once the navigation destinations
+  are covered"); a live run went from 1 step to 4–10 steps. (2)
+  Responses kept arriving without `next_action` or truncated — the
+  explore re-ask suffix now demands `next_action` explicitly, a
+  salvage path re-asks for ONLY the action when the checks parsed,
+  and `max_tokens` rose 8192 → 12000 (the model's documented max
+  output is 384K; reasoning_content 2–4k + 28 checks + action was
+  exceeding 8192). (3) The visited-pages hint ("Pages already
+  visited: …") is appended to each user message from the loop's
+  `location.pathname` tracking — a 10-step run visited 10 distinct
+  pages with no revisits. Report bug fixed: budget-exit paths now
+  record `Screenshots` and final diagnostics (they previously showed
+  0/10 with 10 captures taken).
+
 ## Task Checklist (Phase 3)
 
 1. [x] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold
