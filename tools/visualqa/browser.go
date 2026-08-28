@@ -97,8 +97,14 @@ func fullPageHeightOK(h int) bool { return h <= maxFullPageHeight }
 // returns the filename plus the PNG bytes (passed straight to the vision
 // client). Names are sanitized so a flow can never escape the run dir. The
 // guard checks DEVICE pixels (CSS height × DPR), because that is what the
-// capture and the vision API limits operate on.
-func (s *browserSession) capture(dir, name string, full bool, dpr float64) (string, []byte, error) {
+// capture and the vision API limits operate on. rod panics are recovered so
+// a browser hiccup produces a FAILED run, never a process crash.
+func (s *browserSession) capture(dir, name string, full bool, dpr float64) (file string, png []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("capture %q: %v", name, r)
+		}
+	}()
 	if full {
 		cssH := int(s.page.MustEval(`function() { return Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) }`).Num())
 		if devH := int(float64(cssH) * dpr); !fullPageHeightOK(devH) {
@@ -121,7 +127,7 @@ func (s *browserSession) capture(dir, name string, full bool, dpr float64) (stri
 	} else {
 		buf = s.page.MustScreenshot()
 	}
-	file := unsafeName.ReplaceAllString(name, "-") + ".png"
+	file = unsafeName.ReplaceAllString(name, "-") + ".png"
 	if err := os.WriteFile(filepath.Join(dir, file), buf, 0o644); err != nil {
 		return "", nil, err
 	}

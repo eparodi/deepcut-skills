@@ -36,7 +36,7 @@ func run(args []string) int {
 	maxStepsFlag := fs.Int("max-steps", 15, "hard cap on executed steps per run")
 	maxShotsFlag := fs.Int("max-screenshots", 12, "hard cap on screenshots per run")
 	timeoutFlag := fs.Duration("timeout", 5*time.Minute, "per-run timeout")
-	retriesFlag := fs.Int("retries", 3, "vision-call retry budget for 429/500/503")
+	retriesFlag := fs.Int("retries", 3, "vision-call retry budget (429/500/503/truncated 200s)")
 	modelFlag := fs.String("model", "", "vision model (default deepseek-v4-flash-vision-exp)")
 	apiBaseFlag := fs.String("api-base", "https://api.deepseek.com", "OpenAI-compatible API base URL")
 	captureModeFlag := fs.String("capture-mode", "viewport", "capture default: viewport | full (per-step mode overrides)")
