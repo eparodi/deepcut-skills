@@ -23,6 +23,7 @@
 - [expo](expo)
 - [go-chi](go-chi)
 - [nextjs](nextjs)
+- [visual-qa](visual-qa)
 
 **Process skills**
 - [spec-driven](spec-driven)

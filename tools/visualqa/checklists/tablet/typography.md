@@ -1,0 +1,4 @@
+Body text size: body copy must be legible at tablet distance without zooming — roughly 16 CSS px, about 2% of the 768px frame width per text line. Evidence in frame: estimate the x-height of body text against the frame width; clearly smaller text is a FAIL, borderline is UNCERTAIN.
+Contrast: text must meet WCAG AA — 4.5:1 for body text, 3:1 for large text (24px and up) — in the visible theme. Evidence in frame: flag gray-on-white, white-on-pale, or colored-on-colored pairs; an uncertain ratio is UNCERTAIN.
+Line length: reading columns must be capped — roughly 60-80 characters (about 500-700px at 16px). Evidence in frame: text lines spanning nearly the full 768px frame width are too long and are a FAIL.
+Layout shift: content must not appear displaced, overlapping, or misaligned after load. Evidence in frame: misaligned placeholders or overlapping elements are a FAIL; timing itself is UNCERTAIN from one frame.

@@ -1051,3 +1051,35 @@ bot's own TP fill twice). Filtering the SOURCE (open the stream past
 the last recorded item) is stronger than maintaining shared skip
 state across consumers — state resets, positionals mis-book, and the
 same item can be allocated twice.
+
+### 10.59 A 200 With an Unparseable Body Is Transient — Retry Within the Budget
+
+**A status-code-only retry ladder misses connection-cut bodies**: a 200
+whose JSON was truncated mid-write is a transient provider failure, not
+an application error (2026-08-27: the visual-QA vision client hard-
+failed two runs with `unexpected end of JSON input` until unparseable
+200s became retryable, pinned by a retry-and-exhausted test pair). Treat
+HTTP 200 + failed decode as retryable through the same budget as
+429/500/503; only error out once the budget is exhausted.
+
+### 10.60 Pin Provider Budgets Against Live Measurements and Vendor Docs — Never Assumptions
+
+**Reasonable-sounding budgets can be 10× off from reality**: a 30s
+client timeout vs 26–33s real vision responses, `max_tokens: 4096`
+exhausted by 2k–4k reasoning tokens alone (empty content), and an
+assumed 16384px Chrome capture cap when the binding limit was the
+vision API's documented 8192 px/side (400 "unsupported image") — all
+pinned wrong before the first full-checklist live call (2026-08-27,
+visual-QA). Probe the live provider (measure latency, token burn,
+limits) and read the vendor limits page before fixing timeouts, token
+caps, or image-size guards — then pin the measured numbers in tests.
+
+### 10.61 Content Injected Into a Prompt Is Untrusted — Say It's Data
+
+**Any content channel that injects external text into an LLM prompt
+(page HTML, fetched documents, user-generated strings) is a prompt-
+injection surface** — the system prompt must explicitly say the
+injected content is data to be evaluated, never instructions (2026-08-27:
+the visual-QA HTML-evidence channel; the bot repo's §4.2 learnings rule
+is the same discipline in one repo). Add the sentence when the channel
+ships, not after an incident.

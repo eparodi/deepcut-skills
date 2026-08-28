@@ -1,0 +1,4 @@
+Width utilization: at 1440px the layout should use multiple columns with a capped content width — full-width text lines spanning the entire frame are a FAIL.
+Window sizes: the layout must look intentional at common widths (1440, 1280, 1024) — no horizontal scroll, no broken or cramped grids. Evidence in frame: right-edge clipping or columns that overlap or crowd at the current width are a FAIL.
+Reflow: resizing must reflow content across breakpoints instead of squeezing it. Evidence in frame: at the current width, columns that overlap or text that wraps into absurd shapes are a FAIL; dynamic resize behavior itself is UNCERTAIN from a single frame.
+Density: controls and type must be sized for a pointer device — not mobile proportions. Evidence in frame: buttons and text noticeably oversized as if the phone layout is being shown is a FAIL.

@@ -1,0 +1,4 @@
+Labels & focus: every input must have a visible label and a visible focus indication (ring, border, or background change). Evidence in frame: unlabeled inputs or inputs with no visible focus styling are a FAIL.
+Tab order: cannot be proven from a static frame. Evidence in frame: if a control is focused, check it is visually discoverable and its placement matches the expected order; otherwise mark UNCERTAIN.
+Validation: errors must be inline, readable, and near their field — not only at page top or in a generic toast. Evidence in frame: off-screen, tiny, or disconnected error text is a FAIL.
+Hit areas: controls must be at least 24x24 CSS px (WCAG minimum), 32px+ preferred, with spacing — no overlapping interactive areas. Evidence in frame: small adjacent controls that touch are a FAIL; borderline is UNCERTAIN.

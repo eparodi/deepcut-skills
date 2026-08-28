@@ -50,6 +50,7 @@ Tiers: F = Flash default, P = Pro default; "heavy" = escalation tier.
 | `expo` | Expo/React Native managed-workflow standards | hub + per-repo copy |
 | `go-bot` | Trading-bot Go standards: package layout, slog, ticker/concurrency, BoltDB, exchange/LLM clients, risk guards | per-repo copy |
 | `deepcut-platform` | Media-platform specifics: SRS media server, River jobs, HLS/recording paths, env vars | per-repo copy |
+| `visual-qa` | Headless-Chrome + DeepSeek-vision visual QA: one-shot verify, flow JSON authoring, report interpretation | hub only |
 
 ## Process skills
 

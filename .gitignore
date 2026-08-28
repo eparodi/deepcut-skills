@@ -2,5 +2,9 @@
 /PLAN.md
 /LOOP_LOG.md
 
+# Visual QA: API key + run artifacts (may contain sensitive UI)
+.env.visualqa
+/artifacts/
+
 specs/memories/**
 !specs/memories/README.md

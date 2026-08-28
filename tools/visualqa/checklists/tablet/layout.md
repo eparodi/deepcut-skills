@@ -1,0 +1,4 @@
+Layout intent: at 768px the page must render its tablet layout — multi-column or split-pane where designed, not the squeezed phone layout or a crammed desktop layout. Evidence in frame: a single-column phone layout stretched across the full 768px width, or a desktop layout with columns too narrow to read, is a FAIL.
+Viewport fit: the page must not overflow horizontally at 768px. Evidence in frame: right-edge clipping or a visible horizontal scrollbar is a FAIL.
+Orientation: the frame's aspect ratio must match the intended layout orientation — a wide (landscape) frame showing a squeezed portrait layout, or a tall frame showing a stretched wide layout, is a FAIL.
+Touch reach: primary actions must not sit only at extreme edges or corners, which are hard to reach with a thumb on a large screen. Evidence in frame: corner-only placement of the main action is a FAIL.

@@ -18,7 +18,8 @@
     "security-engineer": { "category": "role", "tags": ["security"], "notes": "" },
     "skill-factory":     { "category": "role", "tags": ["meta", "skills"], "notes": "hub only" },
     "spec-driven":       { "category": "process", "tags": ["workflow"], "notes": "" },
-    "ux-designer":       { "category": "role", "tags": ["design", "ui"], "notes": "" }
+    "ux-designer":       { "category": "role", "tags": ["design", "ui"], "notes": "" },
+    "visual-qa":         { "category": "stack", "tags": ["qa", "vision", "browser"], "notes": "hub only" }
   },
   "per_repo": {
     "bot-engineer": {
