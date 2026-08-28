@@ -1,0 +1,29 @@
+{
+  "feature": "bot-dashboard",
+  "base_url": "http://127.0.0.1:18080",
+  "cases": [
+    {
+      "name": "primary pages",
+      "steps": [
+        { "action": "goto", "url": "/" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "dashboard", "mode": "full", "html": true },
+        { "action": "goto", "url": "/trades" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "trades", "mode": "full", "html": true },
+        { "action": "goto", "url": "/backtest" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "backtest", "mode": "full", "html": true },
+        { "action": "goto", "url": "/settings" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "settings", "mode": "full", "html": true },
+        { "action": "goto", "url": "/equity" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "equity", "mode": "full", "html": true },
+        { "action": "goto", "url": "/capital" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "capital", "mode": "full", "html": true }
+      ]
+    }
+  ]
+}
