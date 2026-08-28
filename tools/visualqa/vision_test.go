@@ -352,6 +352,9 @@ func TestAnalyzeExplorePrompt(t *testing.T) {
 			t.Errorf("explorer prompt lacks %q: %q", want, system)
 		}
 	}
+	if !strings.Contains(system, "estimate pixel dimensions") {
+		t.Errorf("explorer prompt lacks the evidence-reality caveat")
+	}
 	if strings.Contains(system, `"type": "type"`) {
 		t.Errorf("explorer prompt includes the type action without --test-env")
 	}
@@ -438,6 +441,22 @@ func TestAnalyzeExplorePromptTestEnvUnlocksType(t *testing.T) {
 	system := fake.lastRequest().Messages[0].Content[0].Text
 	if !strings.Contains(system, `"type": "type"`) {
 		t.Errorf("explorer prompt lacks the type action with --test-env")
+	}
+}
+
+func TestAnalyzePromptEvidenceReality(t *testing.T) {
+	// The QA system prompt must tell the model it cannot measure pixels from
+	// a downscaled screenshot, and that fixed elements render once at the
+	// viewport position in full-page captures (false-positive prevention).
+	c, fake, _ := newTestClient(t, []fakeResp{{status: 200, body: validBody(`{"checks":[{"item":"x","verdict":"PASS","reason":"ok"}]}`)}})
+	if _, _, err := c.analyze(t.Context(), []byte("fake-png"), "s", "mobile", "f", "c", ""); err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	system := fake.lastRequest().Messages[0].Content[0].Text
+	for _, want := range []string{"estimate pixel dimensions", "fixed/sticky elements render ONCE", "never FAIL a size you cannot measure"} {
+		if !strings.Contains(system, want) {
+			t.Errorf("QA prompt lacks %q", want)
+		}
 	}
 }
 
