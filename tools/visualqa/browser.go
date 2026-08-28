@@ -145,6 +145,29 @@ func (s *browserSession) pageHTML() (html string, err error) {
 	return s.page.MustEval(`function() { return document.documentElement.outerHTML }`).Str(), nil
 }
 
+// injectCookie sets a session cookie scoped to the origin BEFORE the first
+// navigation (US9). The value lives only in the CDP session — never logged.
+func (s *browserSession) injectCookie(name, value, origin string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("inject cookie: %v", r)
+		}
+	}()
+	s.page.MustSetCookies(&proto.NetworkCookieParam{Name: name, Value: value, URL: origin})
+	return nil
+}
+
+// currentPath returns the page's location.pathname — used to track visited
+// pages so the explorer can be nudged toward unvisited sections.
+func (s *browserSession) currentPath() (path string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("current path: %v", r)
+		}
+	}()
+	return s.page.MustEval(`function() { return location.pathname }`).Str(), nil
+}
+
 // execStep runs one flow action. Failures are returned as errors (rod Must*
 // panics are converted), so the caller can fail fast with a clean message.
 func (s *browserSession) execStep(step flowStep) (err error) {
@@ -170,6 +193,9 @@ func (s *browserSession) execStep(step flowStep) (err error) {
 		default:
 			s.page.MustElement(step.Selector).MustScrollIntoView()
 		}
+	case "back":
+		s.page.MustNavigateBack()
+		s.page.MustWaitLoad()
 	case "wait":
 		if step.MS > 0 {
 			time.Sleep(time.Duration(step.MS) * time.Millisecond)

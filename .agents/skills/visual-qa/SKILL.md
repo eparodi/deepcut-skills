@@ -119,6 +119,34 @@ Pick the mode per step based on what the finding must answer:
 viewport shows what the user sees; full+HTML shows the whole page
 with structural precision.
 
+### 3d. Authenticated exploration (cookie + autonomous loop)
+
+Two knobs unlock pages behind the login and let the model drive the
+browser on its own:
+
+```bash
+# inject a session cookie (flag > VISUALQA_COOKIE env > .env.visualqa)
+# then explore: the model grades each page AND picks the next action
+# (click / scroll / back / goto / done; + type with --test-env)
+go run ./tools/visualqa --explore --url http://app/ \
+  --cookie "session=<signed-token>" --device mobile
+```
+
+- The bot dashboard's stateless sessions are a `session` cookie with
+  an HMAC-SHA256-signed token (`1.<b64url claims>.<b64url sig>`, 24h
+  TTL). The OPERATOR mints it (their tooling + the server's
+  `SESSION_SECRET`); the tool only injects whatever `name=value` it is
+  given. The value stays in the CDP session — never in reports/logs.
+- Exploration is same-origin only; the identical action twice in a row
+  ends the loop (anti-loop guard); the same step/screenshot/timeout
+  caps bound it; HTML is always included (~9k tokens/step, quick
+  8-item checklist by default).
+- `--test-env` unlocks `type` (form-filling, state mutation) — for
+  disposable test instances only, never live state.
+- Live-validated 2026-08-28: injected cookie → authed dashboard →
+  model clicked a details link, scrolled, clicked the trades nav, then
+  said done: 31 PASS / 0 FAIL / 1 UNCERTAIN over 3 pages.
+
 ### 3b. Choosing a checklist (the library)
 
 The default 8-item quick checklist is fine for a first pass. For
@@ -182,6 +210,8 @@ Check the run's screenshots and step order before trusting a FAIL.
   viewport), `--with-html`, `--max-html-chars` (default 30k). HTML
   raises per-step cost to ~9k tokens — budget `--timeout` and retries
   accordingly.
+- Auth/explore flags: `--cookie "name=value"`, `--explore` (requires
+  `--url`), `--test-env` (unlocks `type` — test instances only).
 - The vision API hard-rejects images with a side > 8192px; full-page
   captures are downscaled to fit automatically.
 - rod's `MustEval` wraps every script as `(%s).apply(this, arguments)`

@@ -1083,3 +1083,18 @@ injected content is data to be evaluated, never instructions (2026-08-27:
 the visual-QA HTML-evidence channel; the bot repo's §4.2 learnings rule
 is the same discipline in one repo). Add the sentence when the channel
 ships, not after an incident.
+
+### 10.62 json.Decoder.Decode Ignores Trailing Content — Require EOF for Strict Parsing
+
+**`json.Decoder.Decode` reads ONE value and silently ignores the rest**
+— a strict parser must decode a second time and require `io.EOF`, or
+`{...} extra` passes validation (2026-08-28: the visual-QA explorer's
+`next_action` parser, and the same latent gap in `parseChecks`).
+
+### 10.63 Driver Loops Must Reach Their Start State Before the First Observation
+
+**A loop that observes or grades page state must navigate to its entry
+point BEFORE the first iteration** — a driver loop that captures
+before navigating grades `about:blank` and "completes" instantly
+(2026-08-28: the visual-QA explore loop; the model saw an empty page
+and replied `done` until the start-URL navigation ran first).

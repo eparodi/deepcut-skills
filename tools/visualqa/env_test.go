@@ -47,6 +47,60 @@ func TestLoadEnvFileMalformedLineErrors(t *testing.T) {
 	}
 }
 
+func TestResolveCookiePrecedence(t *testing.T) {
+	tests := []struct {
+		name            string
+		flag, env, file string
+		want            string
+	}{
+		{"flag wins", "session=flag", "session=env", "session=file", "session=flag"},
+		{"env beats file", "", "session=env", "session=file", "session=env"},
+		{"file beats none", "", "", "session=file", "session=file"},
+		{"all empty", "", "", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveCookie(tt.flag, tt.env, tt.file); got != tt.want {
+				t.Errorf("resolveCookie = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseCookie(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      string
+		wantN   string
+		wantV   string
+		wantErr bool
+	}{
+		{"valid", "session=eyJhbGciOiJIUzI1NiJ9.abc", "session", "eyJhbGciOiJIUzI1NiJ9.abc", false},
+		{"value with equals", "session=a=b=c", "session", "a=b=c", false},
+		{"empty value allowed", "session=", "session", "", false},
+		{"empty name", "=value", "", "", true},
+		{"no equals", "novalue", "", "", true},
+		{"empty string", "", "", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n, v, err := parseCookie(tt.in)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("parseCookie(%q) succeeded, want error", tt.in)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseCookie(%q): %v", tt.in, err)
+			}
+			if n != tt.wantN || v != tt.wantV {
+				t.Errorf("parseCookie(%q) = %q=%q, want %q=%q", tt.in, n, v, tt.wantN, tt.wantV)
+			}
+		})
+	}
+}
+
 func TestResolveModelPrecedence(t *testing.T) {
 	const def = "deepseek-v4-flash-vision-exp"
 	tests := []struct {

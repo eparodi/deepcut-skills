@@ -95,6 +95,32 @@ func resolveKey(env, file string) string {
 	return ""
 }
 
+// resolveCookie applies flag > env > file (US9 AC1), mirroring the key's
+// precedence. Empty when none is set (no injection).
+func resolveCookie(flag, env, file string) string {
+	for _, v := range []string{flag, env, file} {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// parseCookie splits a "name=value" cookie string on the FIRST '=' so JWT
+// values containing '=' survive intact. Empty name or a missing '=' is an
+// error (US9 AC2) — a mistyped cookie must fail before a browser launches.
+func parseCookie(s string) (name, value string, err error) {
+	name, value, ok := strings.Cut(s, "=")
+	if !ok {
+		return "", "", fmt.Errorf("cookie %q: expected name=value", s)
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", "", fmt.Errorf("cookie %q: empty name", s)
+	}
+	return name, value, nil
+}
+
 // defaultChecklist is the mobile-first QA checklist (overridable via
 // --checklist). It doubles as the prompt's stable prefix.
 func defaultChecklist() []string {
