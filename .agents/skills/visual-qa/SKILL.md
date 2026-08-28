@@ -200,6 +200,19 @@ pre-auth login page, nav-reachability/back-check FAILs are expected
 context (no nav exists yet) — do not file them as regressions.
 Check the run's screenshots and step order before trusting a FAIL.
 
+**Size-based FAILs are not measurements** (proven 2026-08-28, bot
+dashboards): the model sees screenshots downscaled to ~800×800, so it
+cannot estimate pixel dimensions — a 44px target renders as a few
+pixels and the model FAILs it. Before reporting a target-size
+finding, verify it against the page's CSS bundle / computed styles
+(the prompt now instructs the model to mark UNCERTAIN instead, but
+the pre-fix runs produced the false positives). Same for
+fixed-element placement in FULL-page captures: fixed/sticky elements
+render ONCE at their viewport position (near the top of a tall
+capture), so "bottom nav overlaps X" / "thumb reach" findings from
+full-page shots must be confirmed on a viewport capture or in the
+HTML before they count.
+
 ## Guardrails
 
 - Budget flags are mandatory for interactive flows: `--max-steps`,
