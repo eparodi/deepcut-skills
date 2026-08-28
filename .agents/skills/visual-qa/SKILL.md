@@ -184,6 +184,10 @@ Check the run's screenshots and step order before trusting a FAIL.
   accordingly.
 - The vision API hard-rejects images with a side > 8192px; full-page
   captures are downscaled to fit automatically.
+- rod's `MustEval` wraps every script as `(%s).apply(this, arguments)`
+  — write JS as function expressions (`function() { ... }`), never
+  bare statements (`Math.max(...)` panics with `.apply is not a
+  function`).
 - The API key goes ONLY in the Authorization header — never in
   prompts, logs, or reports.
 - Screenshots may contain sensitive UI — they stay under the
