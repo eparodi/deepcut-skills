@@ -227,9 +227,9 @@ show (element sizes in px, labels, aria, alt, hrefs).
 
 As a QA operator, I want to inject a signed `session=<token>` cookie
 into the browser session, so flows and exploration reach
-authenticated pages without the login UI (the dashboard uses
-stateless HMAC-signed session tokens — `auth.SessionCookieName` in
-the bot repo — which the operator mints externally).
+authenticated pages without the login UI (cookie-gated apps; the
+app's own skill/docs document the cookie format and how the operator
+mints it).
 
 **Acceptance Criteria:**
 - Given `--cookie "session=<token>"` (precedence: flag >
@@ -692,8 +692,8 @@ feature (VQ-2 keeps them apart later).
   evidence, UNCERTAIN when evidence is absent (never PASS on missing
   evidence); `max_tokens` raised 2048 → 4096 for the longer items.
 
-- **2026-08-27 (vision reliability, live evidence):** the real DeepSeek
-  round-trip against the trading-bot dashboard exposed two budget
+- **2026-08-27 (vision reliability, live evidence):** a real DeepSeek
+  round-trip against a dashboard-style app exposed two budget
   limits that were too tight for a full 28-item device checklist:
   (1) tool-shaped responses take **26–33 s** (measured via probe), so
   the 30 s `http.Client` timeout killed calls with
@@ -709,13 +709,13 @@ feature (VQ-2 keeps them apart later).
   `timeout` field on `visionClient` (never read — the real timeout
   lives on `http.Client`) was removed.
 
-- **2026-08-27 (live bot-dashboard validation):** full mobile flow
-  (login → home → settings → trades) against the bot dashboard's
-  offline QA instance (`127.0.0.1:18080`, local `operator` test
-  credential) completed: **68 PASS · 7 FAIL · 37 UNCERTAIN** with real
-  findings (settings remove-X tag button under 24×24 px, trades
-  inline links under 44×44 px with tight spacing, no back affordance
-  on the trades sub-page). Caveat to record: nav-reachability/back
+- **2026-08-27 (live validation):** full mobile flow
+  (login → home → settings → a list page) against a dashboard-style
+  app's offline QA instance completed: **68 PASS · 7 FAIL · 37
+  UNCERTAIN** with real
+  findings (a settings remove-X tag button under 24×24 px, inline
+  links under 44×44 px with tight spacing, no back affordance
+  on a sub-page). Caveat to record: nav-reachability/back
   checks FAIL by design on the pre-auth login page — a single-frame
   run cannot know a control is elsewhere; per-page context matters.
 
@@ -743,12 +743,13 @@ feature (VQ-2 keeps them apart later).
 - **2026-08-27 (capture mode changes findings — live diff):** the
   same login flow run in viewport vs full+HTML produced materially
   different verdicts: **68/7/37 → 49/9/27** (PASS/FAIL/UNCERTAIN).
-  Login page: 0 real FAILs → 6 FAILs (target sizes, input size, touch
-  hit area, thumb reach, body text); settings: 3 FAILs (remove-X tag
-  targets, labels) → 0; trades: back-affordance FAIL gone, WCAG/touch
-  target FAILs persist in both. Tokens: 10,967 → 37,266 (~9.3k/step
-  with HTML). Both verdict sets are correct for their evidence — this
-  is why `mode`/`html` are per-step knobs, not global behavior.
+  Login: 0 real FAILs → 6 FAILs (target sizes, input size, touch
+  hit area, thumb reach, body text); a settings page: 3 FAILs
+  (remove-X tag targets, labels) → 0; a list page: back-affordance
+  FAIL gone, WCAG/touch target FAILs persist in both. Tokens: 10,967
+  → 37,266 (~9.3k/step with HTML). Both verdict sets are correct for
+  their evidence — this is why `mode`/`html` are per-step knobs, not
+  global behavior.
 
 - **2026-08-28 (review fixes before merge):** `capture()` gained panic
   recovery (rod `Must*` calls) so a browser death mid-capture
@@ -776,12 +777,10 @@ feature (VQ-2 keeps them apart later).
   (2) `json.Decoder.Decode` silently ignores trailing content, so
   both `parseChecks` and `parseExploreResponse` now require the
   decoder to hit EOF (a `next_action` with garbage after it must not
-  parse). Live run against the offline bot dashboard with a minted
-  `session` cookie: authed dashboard (no login UI) → model clicked a
-  details link, scrolled, clicked the trades nav link, then `done` —
+  parse). Live run against a cookie-gated app with a minted
+  `session` cookie: authenticated pages (no login UI) → the model
+  clicked a details link, scrolled, clicked a nav link, then `done` —
   31 PASS / 0 FAIL / 1 UNCERTAIN over 3 pages, clean diagnostics.
-  The QA instance's `.env` now pins a `SESSION_SECRET` so tokens can
-  be minted deterministically for future runs.
 
 - **2026-08-28 (exploration reliability, live evidence):** three
   iteration fixes from live explore runs with the full 28-item
@@ -863,9 +862,9 @@ feature (VQ-2 keeps them apart later).
     → Satisfies: US1/US2 end-to-end. Browser half proven by the smoke
     test (exit 0, mobile/tablet/desktop); the real DeepSeek
     round-trip still needs the operator's key + network.
-    → **2026-08-27:** completed live — full mobile flow against the
-    bot dashboard's offline QA instance (login → home → settings →
-    trades, 28-rule checklist): 68 PASS · 7 FAIL · 37 UNCERTAIN.
+    → **2026-08-27:** completed live — full mobile flow against a
+    dashboard-style app's offline QA instance (login → home → settings
+    → a list page, 28-rule checklist): 68 PASS · 7 FAIL · 37 UNCERTAIN.
 
 11. [x] (Tooling) `flow.go` + `flow_test.go` — `mode`/`html` step
     fields (per-step override of run-level defaults)
@@ -903,8 +902,8 @@ feature (VQ-2 keeps them apart later).
     → Test: invalid `--capture-mode` exits 2 — red first
     → Satisfies: US7 AC2, US8 AC3
 
-16. [x] (Live) full-page + HTML run against the bot dashboard; diff
-    the findings vs the viewport-only run (the operator's stated
+16. [x] (Live) full-page + HTML run against a dashboard-style app;
+    diff the findings vs the viewport-only run (the operator's stated
     motivation: capture mode changes findings)
     → Run by the operator; record the finding diff in Implementation
     Notes
@@ -953,8 +952,8 @@ feature (VQ-2 keeps them apart later).
     first
     → Satisfies: US10 AC1
 
-23. [x] (Live) explore run against the offline bot dashboard with a
-    minted `session` cookie (operator mints the token); record the
-    exploration path + findings diff vs the hand-authored flow
+23. [x] (Live) explore run against a cookie-gated app with a minted
+    session cookie (operator mints the token); record the exploration
+    path + findings diff vs the hand-authored flow
     → Run by the operator; record in Implementation Notes
     → Satisfies: US9/US10 end-to-end

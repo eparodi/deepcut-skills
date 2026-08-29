@@ -17,8 +17,8 @@ The goal: a wiki for the project whose content is **generated** from the
 SKILL.md files — the files stay the single source of truth — so that "every
 update we make on a skill, we update the wiki" is enforced by a failing
 check instead of by a habit. This follows the repo family's hard-won
-lesson: documented-but-unenforced rules diverge (deepcut-binance-bot
-AGENTS.md §10.15; skills-test AGENTS.md §10.14).
+lesson: documented-but-unenforced rules diverge (the shared §10
+learnings on comment-only contracts and spec-vs-behavior drift).
 
 The wiki is the **GitHub wiki** of this repo
 (`github.com/eparodi/deepcut-skills/wiki`, git remote
@@ -95,9 +95,10 @@ workflow, so "every skill update → wiki update" is enforced, not promised.
   from the SKILL.md files and pushed by the publish step.
 - ❌ Hand-written pages duplicating SKILL.md bodies — the catalog is
   generated; the SKILL.md stays the single source of truth.
-- ❌ Cross-repo catalog of per-repo-only skills (`bot-engineer`,
-  `ui-engineer`, `go-bot`, `deepcut-platform`) in v1 — `AGENT_INDEX.md`
-  remains the cross-repo roster (see DP-2).
+- ❌ Cross-repo catalog of per-repo-only skills — the wiki catalogs only
+  this repo's own skills; per-repo skills are referenced nowhere in this
+  repo except the `AGENT_INDEX.md` roster (enforced 2026-08-29: the
+  generator rejects a `per_repo` manifest).
 - ❌ CI wiring or git hooks — `skills-test` has no CI today; enforcement is
   the local check command (adding CI is a follow-up).
 - ❌ A hosted website — the wiki renders in the repo's markdown viewer.
@@ -109,10 +110,10 @@ workflow, so "every skill update → wiki update" is enforced, not promised.
 1. **DP-1 — Toolchain: Go, stdlib-only.** New `go.mod` (module
    `deepcut-skills`), tool at `tools/wiki-gen/`. The stale-check is a Go
    test: `go test ./...` from the repo root. No external dependencies.
-2. **DP-2 — Scope: hub skills only.** The catalog covers the 19 skills in
-   `skills-test/.agents/skills/`. Per-repo-only skills (`bot-engineer`,
-   `ui-engineer`, `go-bot`, `deepcut-platform`) stay in `AGENT_INDEX.md`
-   (follow-up: extend the wiki when a cross-repo view is wanted).
+2. **DP-2 — Scope: hub skills only.** The catalog covers the hub's own
+   skills in `skills-test/.agents/skills/` (20 today). Per-repo-only
+   skills stay in `AGENT_INDEX.md` — the cross-repo roster; they are
+   never cataloged in the wiki (enforced since 2026-08-29).
 3. **DP-3 — Catalog metadata: `wiki/catalog.json` manifest, validated.**
    Bidirectional check: every skill dir must have an entry; every entry
    must resolve; `category` ∈ {role, stack, process}. The manifest doubles
@@ -138,7 +139,7 @@ workflow, so "every skill update → wiki update" is enforced, not promised.
 | `tools/wiki-gen/generate_test.go` | Pinned checks (below) |
 | `tools/wiki-gen/publish.sh` | Publish flow (below) |
 | `wiki/catalog.json` | Manifest: skill → {category, tags, notes} |
-| `wiki/` | Generated output, committed: `Home.md`, `_Sidebar.md`, `<name>.md` ×19 |
+| `wiki/` | Generated output, committed: `Home.md`, `_Sidebar.md`, one `<name>.md` per hub skill |
 
 **Frontmatter parsing** — within `---` fences, `name:` and `description:`
 are consumed; value = text after the first `:`, trimmed, optional
@@ -222,16 +223,20 @@ never leak). Omitted when the skill has no `##` headings.
   `process-2` and `review-gate`/`review-gate-1`). Pinned by
   `TestSlugify`, `TestSectionsSkipCodeBlocks`, `TestNoTemplateLeak`.
 
-- **2026-08-26 (post-merge follow-up, DP-2):** the catalog now covers the
-  per-repo-only skills (`bot-engineer`, `ui-engineer`, `go-bot`,
-  `deepcut-platform`) via a `per_repo` manifest section. Rationale: hub
-  copies would carry repo-specific references, violating §10.48 (hub free
-  of external project references), and scanning sibling worktrees would
-  break the offline stale-check. Instead the manifest mirrors each skill's
-  one-line description (copied exactly from the source frontmatter at
-  write time), validates name/category/repo/source-path offline, and each
-  generated page links to the real SKILL.md blob in its own repo. The
-  learning-porter owns keeping the mirrored descriptions in sync.
+- **2026-08-26 (post-merge follow-up, DP-2):** the catalog briefly covered
+  per-repo-only skills via a `per_repo` manifest that mirrored each
+  description (copied exactly from the source frontmatter at write time)
+  and linked each generated page to the real SKILL.md blob in its own
+  repo.
+- **2026-08-29 (operator rule — `per_repo` removed):** the per-repo
+  manifest was REMOVED. The hub wiki — and the shared repo — carries NO
+  outside-project references, not even in the wiki (operator
+  instruction; this closes the loophole the 2026-08-26 follow-up had
+  opened). Per-repo skills are referenced nowhere in this repo except
+  the `AGENT_INDEX.md` roster. The generator now REJECTS a `per_repo`
+  manifest loudly (`validateCatalog`, pinned by `TestPerRepoForbidden`)
+  instead of silently ignoring it — the drift-proofing principle applied
+  to the rule itself.
 
 ## Task Checklist (Phase 3)
 

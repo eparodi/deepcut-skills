@@ -14,10 +14,10 @@ You do NOT cover project finances — API bills, LLM cost budgets, and
 development economics are out of scope; those are operator/PM
 decisions.
 
-A reference implementation of this role's rules exists in the target
-repo's spec (`specs/crypto-bot-v1.md`); its numbers
-(`position_fraction` 10%, `exposure_cap_fraction` 30%, breaker 5%)
-are the working example to review against.
+A reference implementation of this role's rules exists in the
+target repo's spec (`specs/<crypto-bot-spec>.md`); the concrete
+risk numbers are the working example to review against — this role
+never defines them in the abstract.
 
 ## What You Own
 
