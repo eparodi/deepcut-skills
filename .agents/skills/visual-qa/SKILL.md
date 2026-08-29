@@ -111,8 +111,8 @@ Per-step values override run-level defaults. Full-page captures are
 downscaled to fit the vision API's 8192 px-per-side limit before
 sending.
 
-**Capture mode changes findings** — proven live (2026-08-27, bot
-dashboards): the same flow in viewport vs full+HTML moved verdicts
+**Capture mode changes findings** — proven live (2026-08-27):
+the same flow in viewport vs full+HTML moved verdicts
 from 68/7/37 to 49/9/27 (PASS/FAIL/UNCERTAIN), with a different FAIL
 set per page. The HTML channel also raises cost to ~9k tokens/step.
 Pick the mode per step based on what the finding must answer:
@@ -132,20 +132,21 @@ go run ./tools/visualqa --explore --url http://app/ \
   --cookie "session=<signed-token>" --device mobile
 ```
 
-- The bot dashboard's stateless sessions are a `session` cookie with
-  an HMAC-SHA256-signed token (`1.<b64url claims>.<b64url sig>`, 24h
-  TTL). The OPERATOR mints it (their tooling + the server's
-  `SESSION_SECRET`); the tool only injects whatever `name=value` it is
-  given. The value stays in the CDP session — never in reports/logs.
+- The tool injects whatever `name=value` it is given and never
+  interprets it — how a cookie-gated app's auth works (cookie names,
+  token format, minting) is the APP's concern, documented in the
+  app's own skill or docs, not here. The value stays in the CDP
+  session — never in reports/logs.
 - Exploration is same-origin only; the identical action twice in a row
   ends the loop (anti-loop guard); the same step/screenshot/timeout
   caps bound it; HTML is always included (~9k tokens/step, quick
   8-item checklist by default).
 - `--test-env` unlocks `type` (form-filling, state mutation) — for
   disposable test instances only, never live state.
-- Live-validated 2026-08-28: injected cookie → authed dashboard →
-  model clicked a details link, scrolled, clicked the trades nav, then
-  said done: 31 PASS / 0 FAIL / 1 UNCERTAIN over 3 pages.
+- Live-validated 2026-08-28 on a cookie-gated web app: injected
+  cookie → authenticated pages → the model clicked a details link,
+  scrolled, clicked a nav link, then said done: 31 PASS / 0 FAIL /
+  1 UNCERTAIN over 3 pages.
 
 ### 3b. Choosing a checklist (the library)
 
@@ -200,8 +201,8 @@ pre-auth login page, nav-reachability/back-check FAILs are expected
 context (no nav exists yet) — do not file them as regressions.
 Check the run's screenshots and step order before trusting a FAIL.
 
-**Size-based FAILs are not measurements** (proven 2026-08-28, bot
-dashboards): the model sees screenshots downscaled to ~800×800, so it
+**Size-based FAILs are not measurements** (proven 2026-08-28):
+the model sees screenshots downscaled to ~800×800, so it
 cannot estimate pixel dimensions — a 44px target renders as a few
 pixels and the model FAILs it. Before reporting a target-size
 finding, verify it against the page's CSS bundle / computed styles
