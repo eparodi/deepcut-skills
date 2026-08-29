@@ -40,17 +40,6 @@ The agent skills of the deepcut-skills hub, cataloged from their SKILL.md files.
 |---|---|---|
 | `spec-driven` | Design and implement features using a specification-first approach with gated phases. Draft requirements, get approval, design architecture, get approval, break down tasks, then implement one task at a time with verification against acceptance criteria. | [spec-driven](spec-driven) |
 
-## Per-repo skills (4)
-
-Skills that live only in their own repository; the hub carries catalog metadata and links to the real SKILL.md.
-
-| Skill | Description | Page |
-|---|---|---|
-| `bot-engineer` | Bot Engineer — owns all Go implementation in the deepcut-binance-bot repository (single-binary trading bot). Implements specs one task at a time, test-first. Never changes the spec's contracts unilaterally. | [bot-engineer](bot-engineer) |
-| `deepcut-platform` | DeepCut Live project-specific integration notes — SRS media server, River job queue, hexagonal module layout, HLS/recording paths, and platform env vars. Load when working on streaming, recording, VOD, chat, or infrastructure code in THIS repo. | [deepcut-platform](deepcut-platform) |
-| `go-bot` | Go standards for the DeepCut trading bot — package layout, slog logging, error handling, ticker/concurrency, BoltDB, Binance/DeepSeek HTTP clients, risk guards, testing, and common AI traps. Load when writing Go code in this repo. | [go-bot](go-bot) |
-| `ui-engineer` | UI Engineer — owns the bot dashboard frontend: Go html/template pages in internal/dashboard, the folder-per-component stylesheet/script registry (components/ + foundation.css), and the vanilla-JS enhancement layer. Load for any HTML/CSS/JS work in the dashboard. | [ui-engineer](ui-engineer) |
-
 ## Regenerating & publishing
 
 - Regenerate: `go run ./tools/wiki-gen` (then `go test ./...`)

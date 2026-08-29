@@ -60,6 +60,28 @@ func TestCatalogCompleteness(t *testing.T) {
 	}
 }
 
+// TestPerRepoForbidden pins the operator rule (2026-08-29): the hub wiki
+// carries NO outside-project references, so a catalog.json that declares a
+// per_repo manifest is rejected loudly — not silently ignored. This is the
+// enforcement half of "the wiki only catalogs its own skills".
+func TestPerRepoForbidden(t *testing.T) {
+	root := testRepoRoot(t)
+	skills, err := loadSkills(filepath.Join(root, skillsDirRel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat := catalog{
+		Skills:  map[string]catalogEntry{},
+		PerRepo: map[string]externalEntry{"external-skill": {Category: "role"}},
+	}
+	for _, s := range skills {
+		cat.Skills[s.Name] = catalogEntry{Category: "role"}
+	}
+	if err := validateCatalog(cat, skills); err == nil {
+		t.Fatal("a per_repo manifest must be rejected (hub wiki catalogs only its own skills)")
+	}
+}
+
 // TestDeterministic pins byte-identical regeneration for unchanged input.
 func TestDeterministic(t *testing.T) {
 	root := testRepoRoot(t)
