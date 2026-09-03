@@ -1098,3 +1098,30 @@ point BEFORE the first iteration** — a driver loop that captures
 before navigating grades `about:blank` and "completes" instantly
 (2026-08-28: the visual-QA explore loop; the model saw an empty page
 and replied `done` until the start-URL navigation ran first).
+
+### 10.59 Remote/Background Runs: Detach, Self-Safe Kills, and File-Based Payloads
+
+**Three remote-ops traps from one 2026-09-02 measurement session** (an A/B
+corpus run as offline jobs on a remote deploy host, live service untouched):
+
+1. **Long jobs must run detached — never hold the ssh session open on the
+   job.** Launch with `setsid <cmd> >out 2>&1 < /dev/null` and RETURN; poll
+   with separate short calls. A batch controller tied to the ssh session
+   dies with the pipe (or the client timeout), orphaning only its children
+   and silently stopping the batch after the first run.
+2. **`pkill -f` matches your OWN command line** when it contains the search
+   text — the cleanup command kills the very session running it. Use a
+   bracket pattern (`pkill -f 'backtes[t]'`) so the pattern text does not
+   match itself, or capture and kill explicit PIDs.
+3. **Multi-layer quoting (local shell → ssh → remote shell → heredoc /
+   `--body` strings) mangles escapes** in one direction or another. Write
+   scripts and long payloads to files and `scp` them (or use a CLI's
+   `--body-file`) instead of inline heredocs; verify the remote file's
+   execution separately from its transfer.
+4. **Offline/measurement config toggles never live in the live service's
+   config** — a feature flag flipped there becomes live behavior on the
+   next restart, mid-measurement. Run offline tools from a scratch
+   directory holding a copy of the config (many loaders read the config
+   relative to the process CWD, so running from the scratch dir is the
+   whole trick), and validate the scratch config with one tiny run before
+   any spend.
