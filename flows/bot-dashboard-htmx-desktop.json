@@ -1,0 +1,39 @@
+{
+  "feature": "bot-dashboard-htmx-desktop",
+  "base_url": "http://pi.hole:8080",
+  "cases": [
+    {
+      "name": "nav swap keeps content visible",
+      "steps": [
+        { "action": "goto", "url": "/" },
+        { "action": "wait", "ms": 1000 },
+        { "action": "screenshot", "name": "home-before", "html": true },
+        { "action": "click", "selector": "aside.sidebar a[href=\"/stats\"]", "capture": true },
+        { "action": "wait", "ms": 1200 },
+        { "action": "screenshot", "name": "stats-after-click", "html": true }
+      ]
+    },
+    {
+      "name": "pages tour",
+      "steps": [
+        { "action": "goto", "url": "/" },
+        { "action": "wait", "ms": 800 },
+        { "action": "click", "selector": "aside.sidebar a[href=\"/equity\"]", "capture": true },
+        { "action": "wait", "ms": 900 },
+        { "action": "click", "selector": "aside.sidebar a[href=\"/capital\"]", "capture": true },
+        { "action": "wait", "ms": 900 },
+        { "action": "click", "selector": "aside.sidebar a[href=\"/settings\"]", "capture": true },
+        { "action": "wait", "ms": 900 },
+        { "action": "screenshot", "name": "settings-after-nav-tour", "html": true }
+      ]
+    },
+    {
+      "name": "arena layout",
+      "steps": [
+        { "action": "goto", "url": "/arena" },
+        { "action": "wait", "ms": 1200 },
+        { "action": "screenshot", "name": "arena", "html": true }
+      ]
+    }
+  ]
+}

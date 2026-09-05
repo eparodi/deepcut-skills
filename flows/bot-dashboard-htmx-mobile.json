@@ -1,0 +1,36 @@
+{
+  "feature": "bot-dashboard-htmx-mobile",
+  "base_url": "http://pi.hole:8080",
+  "cases": [
+    {
+      "name": "nav swap keeps content visible",
+      "steps": [
+        { "action": "goto", "url": "/" },
+        { "action": "wait", "ms": 1000 },
+        { "action": "screenshot", "name": "home-before", "html": true },
+        { "action": "click", "selector": "nav.bottom-nav a[href=\"/trades\"]", "capture": true },
+        { "action": "wait", "ms": 1200 },
+        { "action": "screenshot", "name": "trades-after-click", "html": true }
+      ]
+    },
+    {
+      "name": "mobile drawer closes on nav",
+      "steps": [
+        { "action": "goto", "url": "/" },
+        { "action": "wait", "ms": 800 },
+        { "action": "click", "selector": "label.sidebar-toggle-btn", "capture": true },
+        { "action": "click", "selector": "aside.sidebar a[href=\"/equity\"]", "capture": true },
+        { "action": "wait", "ms": 1200 },
+        { "action": "screenshot", "name": "after-nav-from-drawer", "html": true }
+      ]
+    },
+    {
+      "name": "arena layout",
+      "steps": [
+        { "action": "goto", "url": "/arena" },
+        { "action": "wait", "ms": 1200 },
+        { "action": "screenshot", "name": "arena", "html": true }
+      ]
+    }
+  ]
+}

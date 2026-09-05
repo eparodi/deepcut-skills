@@ -181,7 +181,13 @@ func (s *browserSession) execStep(step flowStep) (err error) {
 		s.page.MustNavigate(step.URL)
 		s.page.MustWaitLoad()
 	case "click":
-		s.page.MustElement(step.Selector).MustScrollIntoView().MustClick()
+		// Bound the whole click chain: rod has no default timeout, so a
+		// missing or covered selector hangs the run forever (2026-09-05:
+		// an htmx nav selector that didn't exist hung a QA run past its
+		// run timeout). The timeout panic is recovered into a step
+		// error by the caller — the run fails fast with the selector.
+		p := s.page.Timeout(15 * time.Second)
+		p.MustElement(step.Selector).MustScrollIntoView().MustClick()
 	case "type":
 		s.page.MustElement(step.Selector).MustScrollIntoView().MustInput(step.Text)
 	case "scroll":
