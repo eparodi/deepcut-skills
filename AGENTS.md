@@ -1140,9 +1140,9 @@ an equity figure that includes it). Before summing money for display,
 trace every bucket to the owning code (the feature spec, the client, the
 valuation path) — never infer the model from a field name or a comment —
 label each component so the row reconciles against the figures beside it,
-and pin the composition with the discriminating fixture. The undercount-
-view family in money form: a comment that names the wrong mechanism hides
-real money.
+and pin the composition with the discriminating fixture. The §10.33
+undercount-view family in money form: a comment that names the wrong
+mechanism hides real money.
 
 ### 10.65 Spec-Promised Output Is Pinned on Every Path — the Degraded One Included
 
