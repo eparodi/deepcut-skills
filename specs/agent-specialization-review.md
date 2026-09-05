@@ -62,7 +62,7 @@ pattern in session logs/retros). Candidates, strongest first:
 | # | Split | From | Rationale / evidence |
 |---|---|---|---|
 | C1 | `bot-engineer` → `trading-loop-engineer` (ensemble/risk/execute/memory/sampler) + `integrations-engineer` (market + llm clients) + `bot-ops` (config, systemd, deploy scripts, cross-compile) | bot-engineer (174 ln, "all Go code") | "All Go code" is unmanageable; the repo now has a dozen focused packages; deploy-ordering corrections recur in session logs (§10.10) |
-| C2 | `media-pipeline` (ffmpeg/SRS/HLS/recording) from go-chi's `Subprocess Hygiene` + the platform skill's SRS content | go-chi (888 ln) + deepcut-platform | Media failures recurred repeatedly (skills-test §10.7, §10.8: SRS payload drift, subprocess hygiene); the knowledge is split across two skills today |
+| C2 | `media-pipeline` (ffmpeg/SRS/HLS/recording) from go-chi's `Subprocess Hygiene` + the platform skill's SRS content | go-chi (888 ln) + media-platform (per-repo) | Media failures recurred repeatedly (skills-test §10.7, §10.8: SRS payload drift, subprocess hygiene); the knowledge is split across two skills today |
 | C3 | `go-websocket` from go-chi's 100-line WebSocket section | go-chi | Self-contained topic, only needed by streaming work |
 | C4 | `web-ui-patterns` from nextjs's 220-line Component Patterns section | nextjs (854 ln) | Shared by frontend + dashboard UI work; nextjs itself stays routing/data-focused |
 | C5 | `eas-build-deploy` from expo's Build & Deploy section | expo (533 ln) | Deploy-only knowledge, loaded only when shipping |

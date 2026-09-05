@@ -1,0 +1,29 @@
+{
+  "feature": "dashboard-tour",
+  "base_url": "http://127.0.0.1:8080",
+  "cases": [
+    {
+      "name": "primary pages",
+      "steps": [
+        { "action": "goto", "url": "/" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "dashboard", "mode": "full", "html": true },
+        { "action": "goto", "url": "/stats" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "stats", "mode": "full", "html": true },
+        { "action": "goto", "url": "/reports" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "reports", "mode": "full", "html": true },
+        { "action": "goto", "url": "/settings" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "settings", "mode": "full", "html": true },
+        { "action": "goto", "url": "/analytics" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "analytics", "mode": "full", "html": true },
+        { "action": "goto", "url": "/ledger" },
+        { "action": "wait", "ms": 700 },
+        { "action": "screenshot", "name": "ledger", "mode": "full", "html": true }
+      ]
+    }
+  ]
+}

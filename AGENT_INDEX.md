@@ -1,7 +1,7 @@
 # Agent Index
 
 > Canonical roster of every agent skill in the repos.
-> Last updated: 2026-08-26. Sources: `*/zed/profiles.json` (v1.5.0),
+> Last updated: 2026-09-05. Sources: `*/zed/profiles.json` (v1.5.0),
 > `*/.agents/skills/*/SKILL.md`.
 >
 > **Live catalog:** the generated wiki
@@ -49,7 +49,8 @@ Tiers: F = Flash default, P = Pro default; "heavy" = escalation tier.
 | `nextjs` | Next.js App Router standards: RSC, data fetching, caching, layouts | hub + per-repo copy |
 | `expo` | Expo/React Native managed-workflow standards | hub + per-repo copy |
 | `go-bot` | Trading-bot Go standards: package layout, slog, ticker/concurrency, BoltDB, exchange/LLM clients, risk guards | per-repo copy |
-| `deepcut-platform` | Media-platform specifics: SRS media server, River jobs, HLS/recording paths, env vars | per-repo copy |
+| `media-platform` | Media-platform specifics (SRS media server, River jobs, HLS/recording paths, env vars) | per-repo copy |
+| `go-htmx` | HTMX v4 usage for Go html/template apps: partial-render contract, config, attributes, forms, history, traps | hub + per-repo copy |
 | `visual-qa` | Headless-Chrome + DeepSeek-vision visual QA: one-shot verify, flow JSON authoring, report interpretation | hub only |
 
 ## Process skills
@@ -60,10 +61,11 @@ Tiers: F = Flash default, P = Pro default; "heavy" = escalation tier.
 
 ## Duplication & Drift
 
-- 10 skills exist in 2+ repos as separate files: `pm`, `architect`,
+- 11 skills exist in 2+ repos as separate files: `pm`, `architect`,
   `ux-designer`, `reviewer`, `qa`, `security-engineer`,
   `orchestrator`, `spec-driven` (3 repos each); `ai-engineer`,
-  `financial-analyst` (2 repos each).
+  `financial-analyst` (2 repos each); `go-htmx` (2 repos: hub + the
+  Go dashboard repo's repo-specific copy).
 - The per-repo registry files (`zed/profiles.json`) and
   `HOW_WE_WORK.md` had already diverged before 2026-08-15 (different
   role sets, versions 1.3.0 / 1.2.0 / 1.0.0) — the skill files are
