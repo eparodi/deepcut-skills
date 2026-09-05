@@ -28,6 +28,16 @@
       ]
     },
     {
+      "name": "subnav buttons survive the swap",
+      "steps": [
+        { "action": "goto", "url": "/" },
+        { "action": "wait", "ms": 1000 },
+        { "action": "click", "selector": "nav.subnav a[href=\"/equity\"]" },
+        { "action": "wait", "ms": 1200 },
+        { "action": "screenshot", "name": "subnav-after-click", "html": true }
+      ]
+    },
+    {
       "name": "arena layout",
       "steps": [
         { "action": "goto", "url": "/arena" },
