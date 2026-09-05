@@ -389,7 +389,7 @@ At the end of a feature or session:
 
 ---
 
-*Last updated: 2026-08-27*
+*Last updated: 2026-09-05*
 *These rules apply to all agent threads in this project.*
 
 ---
@@ -1125,3 +1125,47 @@ corpus run as offline jobs on a remote deploy host, live service untouched):
    relative to the process CWD, so running from the scratch dir is the
    whole trick), and validate the scratch config with one tiny run before
    any spend.
+
+### 10.64 Money-Total Displays Enumerate the System's Actual Buckets — a Plausible Mechanism in a Comment Is Not a Model
+
+**A money-total display must sum the system's ACTUAL money buckets as the
+owning code defines them — where each bucket's balance lives (the spot
+wallet vs a separate-product balance API), how money moves between buckets
+— and label each component** (2026-09-05: a "total on account" row
+promised "plus parked when any" but modeled the parked money as a claim
+token already in the spot balances, when the owning code's model parks
+into a SEPARATE product fetched by its own API — the total silently
+omitted the largest bucket on the live account while sitting one row above
+an equity figure that includes it). Before summing money for display,
+trace every bucket to the owning code (the feature spec, the client, the
+valuation path) — never infer the model from a field name or a comment —
+label each component so the row reconciles against the figures beside it,
+and pin the composition with the discriminating fixture. The §10.33
+undercount-view family in money form: a comment that names the wrong
+mechanism hides real money.
+
+### 10.65 Spec-Promised Output Is Pinned on Every Path — the Degraded One Included
+
+**When a spec or amendment promises a row/message on every code path, EACH
+path — the degraded/error one included — must render the promised content,
+pinned against the PROMISE, not against what the code happens to do**
+(2026-09-05: a ledger-unreadable early return dropped the spend rows its
+own amendment promised on exactly that path; the pin asserted only the
+note + the one surviving row, so the drop shipped green). Write the pin
+from the spec's promise first ("rows X and Y still render when the ledger
+is unreadable"), watch it fail red on the early-return path, then make the
+code pass — a test that asserts the code's actual output instead of the
+spec's promise cannot catch the promised-row drop.
+
+### 10.66 One Entity's Rows Get One Shared Renderer — a Hand-Copied Second Renderer Drifts
+
+**When a view is re-expressed (a compact card + a drill-down detail, a
+summary + a full list), the duplicated entity rows share ONE builder — a
+second, hand-copied renderer for the same rows silently drifts** (2026-09-
+05: a detail view re-implemented the record rows and lost the attribution
+marker the original carried — while the original had already become dead
+code that kept the correct behavior, so the drift was invisible to the
+build). Delete the superseded renderer in the SAME change that adds its
+replacement, keep one row builder, and pin the discriminating case (the
+exact marker/formatting the copy dropped) so the two can never disagree
+again.
