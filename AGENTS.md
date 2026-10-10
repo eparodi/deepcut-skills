@@ -1169,3 +1169,24 @@ build). Delete the superseded renderer in the SAME change that adds its
 replacement, keep one row builder, and pin the discriminating case (the
 exact marker/formatting the copy dropped) so the two can never disagree
 again.
+
+### 10.67 HTML Template Files Are Mangled by write_file/edit_file — Use a Quoted Heredoc
+
+**Writing a `.html`/`.htmx` template through `write_file`/`edit_file` can
+run an HTML auto-close pass that injects stray closing tags** — `</h1>`,
+`</code>`, `</li>` land mid-template and corrupt `{{...}}` actions
+(2026-09-09: `write_file` mangled a settings form; a stray `</li>` split
+`{{.Config.Store.Driver}}` and broke the template parse). Write HTML
+templates via a quoted heredoc (`cat > f <<'EOF' … EOF`) and re-read the
+file to verify (same family as §10.11).
+
+### 10.68 A Struct Value Copy Still Shares Reference-Type Fields
+
+**Returning or assigning a struct by value copies the struct but NOT its
+map or slice fields** — both copies point at the same underlying
+map/slice, so mutating the "copy" mutates the original (and can race it)
+(2026-09-09: a `Runtime.Get()` that returns `Config` by value handed
+callers the live `Config.Providers` map; `apply` mutated it before
+validate/save). Deep-copy reference-type fields before mutating a "copy",
+or return an explicit deep copy, and pin it with a regression test that
+asserts the original is unchanged on the error path.
