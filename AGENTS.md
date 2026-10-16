@@ -1169,3 +1169,19 @@ build). Delete the superseded renderer in the SAME change that adds its
 replacement, keep one row builder, and pin the discriminating case (the
 exact marker/formatting the copy dropped) so the two can never disagree
 again.
+
+### 10.67 Keep Functions Short and Single-Purpose — Split at Phase Boundaries
+
+**Keep functions short and single-purpose: a function that grows past
+roughly one screen or mixes phases (parse / validate / assemble) gets
+split into separately named stages**, so the caller reads as a
+one-sentence summary and each stage keeps one job (2026-10-15: a
+build-review round flagged a 55-line loader that mixed parsing,
+validation and assembly; the behavior-untouched fix was one short loader
+stage per input, each recording its problem in one shared list — the
+assembler reports them all, so the aggregate error still names every
+offending input in a stable order). Split at the phase boundary, not at a
+line count; have each stage append to the shared aggregate instead of
+returning early; and pin the aggregate error's exact wording and order
+before the split (green before, green after), so the refactor cannot
+quietly reword what an operator reads.
