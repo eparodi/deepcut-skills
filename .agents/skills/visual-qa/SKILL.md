@@ -190,9 +190,9 @@ weak pass.
   was unparseable); re-run or take a human look.
 - **Run Status** — `COMPLETED` (findings may still exist) vs `FAILED`
   (aborted: budget, timeout, step error, provider failure).
-- The **Diagnostics** section lists console errors and failed network
-  requests captured from CDP events — worth checking before trusting
-  a PASS.
+- The **Diagnostics** section lists console errors, uncaught JS
+  exceptions, and failed network requests captured from CDP events —
+  worth checking before trusting a PASS.
 
 ## Interpreting verdicts — context matters
 
@@ -253,5 +253,5 @@ rejects an unknown action with exit 2.
 ## Handoff
 
 Report: run id, device, status, per-step verdicts, diagnostics
-(console errors / failed requests), and screenshot paths. Output
-`[VISUAL_QA_DONE]` when complete.
+(console errors / uncaught exceptions / failed requests), and
+screenshot paths. Output `[VISUAL_QA_DONE]` when complete.
