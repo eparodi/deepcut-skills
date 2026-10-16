@@ -800,6 +800,26 @@ feature (VQ-2 keeps them apart later).
   record `Screenshots` and final diagnostics (they previously showed
   0/10 with 10 captures taken).
 
+- **2026-10-16 (uncaught exceptions were invisible to diagnostics):**
+  a page that threw three uncaught `TypeError`s on every load produced
+  `Diagnostics (none)` across multiple QA runs. Cause: `openBrowser`
+  subscribed only `RuntimeConsoleAPICalled` (console.error) and
+  `NetworkLoadingFailed`; an uncaught JS exception is a third CDP
+  event, `Runtime.exceptionThrown`, with no handler. The session now
+  records `uncaught exception: <message> (<first-frame url:line:col>)`:
+  the description's first line (thrown primitives fall back to the
+  value; the generic "Uncaught" text is the last resort), the first
+  stack frame — falling back to the exception's own location — and
+  0-based CDP line/col shifted to 1-based to match the browser console
+  and `error.stack`. rod's `EachEvent` auto-enables the domain of each
+  subscribed event (verified against the installed v0.114.8 source),
+  so no manual `Runtime.enable` call is needed. Pinned by
+  `TestExceptionDiagnostic` (format table) and
+  `TestOpenBrowserCapturesUncaughtException` (a local throwing page
+  driven through `openBrowser`; proven red without the handler, green
+  with it). The browser test skips when no browser is cached locally,
+  so `go test` never triggers rod's downloader.
+
 ## Task Checklist (Phase 3)
 
 1. [x] (Tooling) Add `github.com/go-rod/rod` to the module; scaffold

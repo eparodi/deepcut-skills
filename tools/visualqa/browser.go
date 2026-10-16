@@ -16,7 +16,8 @@ import (
 )
 
 // browserSession wraps the rod browser + page and collects CDP diagnostics
-// (console errors, failed network requests) for the report.
+// (console errors, uncaught exceptions, failed network requests) for the
+// report.
 type browserSession struct {
 	browser *rod.Browser
 	page    *rod.Page
@@ -48,9 +49,69 @@ func openBrowser(ctx context.Context, profile deviceProfile) (*browserSession, e
 		func(e *proto.NetworkLoadingFailed) {
 			s.addDiag(fmt.Sprintf("failed request: %s (%s)", e.ErrorText, e.Type))
 		},
+		func(e *proto.RuntimeExceptionThrown) {
+			s.addDiag(exceptionDiagnostic(e.ExceptionDetails))
+		},
 	)
 	go wait()
 	return s, nil
+}
+
+// exceptionDiagnostic renders an uncaught JS exception as one concise report
+// line: the exception message plus the first stack frame's location. The
+// description carries the whole V8 stack; only its first line is reported,
+// because the first frame (reported separately) is where the exception
+// actually fired.
+func exceptionDiagnostic(d *proto.RuntimeExceptionDetails) string {
+	if d == nil {
+		return "uncaught exception: (no details)"
+	}
+	msg := exceptionMessage(d)
+	if loc := exceptionLocation(d); loc != "" {
+		msg += " (" + loc + ")"
+	}
+	return "uncaught exception: " + msg
+}
+
+// exceptionMessage prefers the thrown Error's description (first line only);
+// thrown primitives carry a value instead, and the generic "Uncaught" text is
+// the last resort.
+func exceptionMessage(d *proto.RuntimeExceptionDetails) string {
+	if e := d.Exception; e != nil {
+		if msg := firstLine(e.Description); msg != "" {
+			return msg
+		}
+		if v := e.Value.Val(); v != nil {
+			return fmt.Sprintf("%v", v)
+		}
+	}
+	if d.Text != "" {
+		return d.Text
+	}
+	return "(no message)"
+}
+
+// exceptionLocation is the first stack frame, falling back to the exception's
+// own location when no stack is available. CDP frames are 0-based; +1 makes
+// the line match what the browser console and error.stack show.
+func exceptionLocation(d *proto.RuntimeExceptionDetails) string {
+	url, line, col := d.URL, d.LineNumber, d.ColumnNumber
+	if st := d.StackTrace; st != nil && len(st.CallFrames) > 0 {
+		f := st.CallFrames[0]
+		url, line, col = f.URL, f.LineNumber, f.ColumnNumber
+	}
+	if url == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d:%d", url, line+1, col+1)
+}
+
+// firstLine trims a multi-line V8 description down to its message line.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s)
 }
 
 func (s *browserSession) addDiag(line string) {

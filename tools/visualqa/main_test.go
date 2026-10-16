@@ -64,7 +64,9 @@ func TestRunValidationErrors(t *testing.T) {
 
 // The browser path itself (launch, emulation, screenshot, actions) is
 // exercised by the skill's Test Task with a real Chrome — the repo has no
-// CI and unit tests must stay offline.
+// CI and unit tests must stay offline. The one unit test that launches a
+// browser (browser_test.go) drives a local page for diagnostics capture
+// and skips when no browser is cached locally, so it never downloads.
 
 func TestCaptureModeResolution(t *testing.T) {
 	full := true
