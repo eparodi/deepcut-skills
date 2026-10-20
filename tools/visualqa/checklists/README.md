@@ -6,14 +6,16 @@ group, or at a **directory** to run every `.md` file in it (all groups).
 
 ```
 checklists/
-  mobile/   layout  typography  navigation  forms  media  interactions  accessibility
-  tablet/   layout  typography  navigation  forms  media  interactions  accessibility
-  desktop/  layout  typography  navigation  forms  media  interactions  accessibility
+  mobile/   layout  typography  navigation  forms  media  interactions  accessibility  craft
+  tablet/   layout  typography  navigation  forms  media  interactions  accessibility  craft
+  desktop/  layout  typography  navigation  forms  media  interactions  accessibility  craft
 ```
 
 Sources for every rule: `docs/research/visual-qa-device-design-sources.md`
 (Google web.dev, W3C WAI + WCAG 2.2, NN/g, Smashing, CSS-Tricks, MDN,
-LukeW, A List Apart, Baymard).
+LukeW, A List Apart, Baymard). The `craft` group distills design-craft
+practice (hierarchy, surface depth, motion, content containment) rather than a
+single published checklist.
 
 ## Usage
 
@@ -58,6 +60,15 @@ Examples of the precision:
 | `media` | scaling, aspect ratios, playback, lazy-load alignment |
 | `interactions` | target sizes, feedback, sticky overlap, states, hover |
 | `accessibility` | WCAG 2.5.8 target size, reflow, order/names, keyboard op |
+| `craft` | content containment, app-scale hierarchy, flat surfaces, meaningful motion/figures |
+
+**Craft findings are design decisions.** The `craft` group encodes the bars the
+design-skill inspectors use. A FAIL on flat surfaces or app-scale hierarchy
+means the screen is making a different design choice, not that it is broken;
+confirm with the design owner. Properties a static frame cannot show (hover
+stickiness, reduced-motion behavior, computed font/numeral sizes) are
+deliberately marked UNCERTAIN — use the browser inspectors or computed styles
+for those.
 
 ## Device notes
 
@@ -72,6 +83,7 @@ Examples of the precision:
 
 Each checklist item becomes one vision-model check (~384 tokens per
 screenshot regardless of list size, so the cost driver is screenshots,
-not checklist length). A full device run is 28 rules — under the
-32-item response clamp the tool enforces. Keep custom checklists
-focused: 8-12 rules is the sweet spot for model reliability.
+not checklist length). A full device run is 32 rules (28 + the 4-rule
+`craft` group) — exactly at the 32-item response clamp the tool enforces.
+Keep custom checklists focused: 8-12 rules is the sweet spot for model
+reliability.

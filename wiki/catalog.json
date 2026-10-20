@@ -8,6 +8,7 @@
     "financial-analyst": { "category": "role", "tags": ["risk", "money"], "notes": "" },
     "frontend-engineer": { "category": "role", "tags": ["nextjs", "frontend"], "notes": "" },
     "go-chi":            { "category": "stack", "tags": ["go", "backend"], "notes": "" },
+    "go-htmx":           { "category": "stack", "tags": ["go", "htmx", "html"], "notes": "" },
     "learning-porter":   { "category": "role", "tags": ["meta", "learnings"], "notes": "hub only" },
     "mobile-engineer":   { "category": "role", "tags": ["expo", "mobile"], "notes": "" },
     "nextjs":            { "category": "stack", "tags": ["nextjs", "frontend"], "notes": "" },

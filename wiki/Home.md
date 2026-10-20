@@ -20,17 +20,18 @@ The agent skills of the deepcut-skills hub, cataloged from their SKILL.md files.
 | `orchestrator` | Single-thread Master Orchestrator — simulates a 4-role team (PLANNER/CODER/REVIEWER/DEBUGGER) in one agent thread and loops until PLAN.md is fully checked off. Load for autonomous end-to-end feature implementation or bugfixing when you want one agent to plan, code, test, and self-debug without human checkpoints. | [orchestrator](orchestrator) |
 | `pm` | Project Manager — owns requirements, user stories, acceptance criteria, task breakdown, and spec lifecycle. Never writes code. Routes all ambiguity back to artifact owners. | [pm](pm) |
 | `qa` | QA Engineer — validates completed features against their specification. Runs test suites, verifies API contracts, inspects UI states, and produces structured QA reports. Never writes implementation code. | [qa](qa) |
-| `reviewer` | Code Reviewer — reviews PRs for correctness, style, security, and adherence to project standards. Produces structured review reports with severity levels. Never writes implementation code. | [reviewer](reviewer) |
+| `reviewer` | Code Reviewer — reviews PRs for correctness, style, security, and adherence to project standards. Produces structured severity-ranked reports; in Fix Loop Mode drives the findings to zero (fix, evidence, full re-review, repeat) until a fresh review passes. Load for reviews and for "fix the review" / "loop until everything is okay". | [reviewer](reviewer) |
 | `security-engineer` | Security Engineer — audits the application for security vulnerabilities, performs penetration testing on local deployments, and enforces security standards. Runs in parallel with QA. Produces structured security reports. Never writes implementation code. | [security-engineer](security-engineer) |
 | `skill-factory` | Skill Factory — creates super-specific agent skills from recurring evidence, gated, deduped, YAML-validated, and human-approved. Never speculative. | [skill-factory](skill-factory) |
 | `ux-designer` | UX Designer — research-driven owner of UI design: screens, design system, spacing, responsive behavior, accessibility, and UX copy. Grounds every decision in documented principles from major design systems (NN/g, Apple HIG, Material, WCAG, Laws of UX). Coordinates with the Architect on the API/UI boundary. Never writes implementation code. | [ux-designer](ux-designer) |
 
-## Stack skills (4)
+## Stack skills (5)
 
 | Skill | Description | Page |
 |---|---|---|
 | `expo` | Expo/React Native (managed workflow) development standards — project layout, Expo Router, platform-specific patterns, testing, and managed workflow boundaries. Load when writing React Native code in the mobile/ directory. | [expo](expo) |
 | `go-chi` | Go/chi backend development standards — layering, error handling, concurrency, state management, testing, database patterns, and common AI traps. Load when writing Go code in the backend/ directory. | [go-chi](go-chi) |
+| `go-htmx` | HTMX usage rules for Go html/template server-side apps — the partial-render contract (Rule A/B), required v4 config, attribute patterns, forms/validation, history, security, and testing. Load when writing or reviewing any hx-* attribute, HX-* header, partial render, or htmx wiring. | [go-htmx](go-htmx) |
 | `nextjs` | Next.js App Router development standards — Server Components, data fetching, route handlers, caching, layout patterns, and platform-specific AI traps. Load when writing TypeScript/React code in the frontend/ directory. | [nextjs](nextjs) |
 | `visual-qa` | Visual QA — drives headless Chrome via tools/visualqa with DeepSeek vision: one-shot page verification, multi-case flow JSON authoring, and report interpretation across mobile/tablet/desktop viewports. Load when a QA session needs to verify rendered UI states or author visual-QA flows. | [visual-qa](visual-qa) |
 

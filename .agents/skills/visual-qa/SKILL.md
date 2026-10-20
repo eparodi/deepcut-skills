@@ -167,11 +167,15 @@ go run ./tools/visualqa --url <url> --device mobile \
 ```
 
 Groups: `layout`, `typography`, `navigation`, `forms`, `media`,
-`interactions`, `accessibility` (one file per device × group). Each
+`interactions`, `accessibility`, `craft` (one file per device × group).
+The `craft` group encodes the design-craft bars (content containment,
+app-scale hierarchy, flat surfaces, meaningful motion/figures); a FAIL there
+is a design decision, not automatically a regression. Each
 device is tuned to its form factor — mobile is touch/thumb/safe-area
 centric, tablet adds hybrid hover+touch and split-pane, desktop adds
 keyboard operation and window-resize behavior. A full device run is
-28 rules, under the tool's 32-check response clamp.
+32 rules (28 + the 4-rule `craft` group), at the tool's 32-check response
+clamp.
 
 **Rule precision:** every rule states an exact bar (44×44 CSS px touch
 targets, WCAG 2.5.8's 24×24, 4.5:1/3:1 contrast, 60-80ch line

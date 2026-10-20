@@ -219,7 +219,7 @@ func TestNoTemplateLeak(t *testing.T) {
 		"learning-porter":   6,
 		"qa":                6,
 		"security-engineer": 7,
-		"reviewer":          5,
+		"reviewer":          6,
 	} {
 		if counts[name] != want {
 			t.Errorf("%s: %d sections, want %d (template headings leaked?)", name, counts[name], want)
