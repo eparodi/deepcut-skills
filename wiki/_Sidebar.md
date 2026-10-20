@@ -22,6 +22,7 @@
 **Stack skills**
 - [expo](expo)
 - [go-chi](go-chi)
+- [go-htmx](go-htmx)
 - [nextjs](nextjs)
 - [visual-qa](visual-qa)
 
